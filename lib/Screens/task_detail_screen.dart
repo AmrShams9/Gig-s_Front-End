@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../widgets/questions_card.dart';
+import '../widgets/offers_card.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -126,82 +128,62 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
             ),
             // Questions Tab Content
-            (widget.task.questions != null && widget.task.questions!.isNotEmpty)
-                ? ListView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    itemCount: widget.task.questions!.length,
-                    itemBuilder: (context, index) {
-                      final question = widget.task.questions![index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'User: ${question.userId}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                question.questionText,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                '${question.timestamp.toLocal().toString().split('.').first}',
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  )
-                : const Center(child: Text('No questions yet.')),
+            ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: const [
+                QuestionsCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  userName: 'Sarah Johnson',
+                  rating: 4.8,
+                  question: 'What is the expected duration of this task?',
+                  answer: 'The task should take approximately 2-3 hours to complete.',
+                ),
+                QuestionsCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  userName: 'Mike Thompson',
+                  rating: 4.5,
+                  question: 'Are there any specific tools required?',
+                  answer: 'Yes, you will need basic gardening tools. We can provide some if needed.',
+                ),
+                QuestionsCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  userName: 'Emily Davis',
+                  rating: 4.9,
+                  question: 'Is there parking available nearby?',
+                  answer: 'Yes, there is street parking available and a parking lot within walking distance.',
+                ),
+              ],
+            ),
             // Offers Tab Content
-            (widget.task.offers != null && widget.task.offers!.isNotEmpty)
-                ? ListView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    itemCount: widget.task.offers!.length,
-                    itemBuilder: (context, index) {
-                      final offer = widget.task.offers![index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Runner: ${offer.runnerId}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                'Offer Amount: \$${offer.amount.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 14, color: Color(0xFF1DBF73)),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                offer.message,
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                '${offer.timestamp.toLocal().toString().split('.').first}',
-                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  )
-                : const Center(child: Text('No offers yet.')),
+            ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                OffersCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  runnerName: 'Alex Morgan',
+                  amount: 150.00,
+                  message: 'I have extensive experience in similar tasks and can complete this efficiently. I\'m available immediately and can start right away.',
+                  timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+                  rating: 4.9,
+                ),
+                OffersCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  runnerName: 'David Wilson',
+                  amount: 175.00,
+                  message: 'I specialize in this type of work and have all the necessary tools. I can provide references from previous clients.',
+                  timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+                  rating: 4.7,
+                ),
+                OffersCard(
+                  profileImage: 'https://via.placeholder.com/50',
+                  runnerName: 'Lisa Chen',
+                  amount: 140.00,
+                  message: 'I\'m very interested in this task and can complete it with high quality. I\'m flexible with timing and can work around your schedule.',
+                  timestamp: DateTime.now().subtract(const Duration(days: 1)),
+                  rating: 4.8,
+                ),
+              ],
+            ),
           ],
         ),
         bottomNavigationBar: Padding(

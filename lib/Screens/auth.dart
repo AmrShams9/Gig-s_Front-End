@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+//firbasefirstore.instance.collection('users').doc(user id).set(username email imageurl,
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -26,7 +26,7 @@ class _AuthScreenState extends State<AuthScreen> {
   var _enteredLastName = '';
   var _enteredGovernmentId = '';
   File? _selectedImage;
-  String _selectedRole = 'runner'; // Default role
+  var _selectedRoles = <String>[]; // List to store selected roles
   var _isLoading = false;
   String? _tempPassword; // Add this line to store password temporarily
 
@@ -86,20 +86,20 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  void _toggleRole(String role) {
+    setState(() {
+      if (_selectedRoles.contains(role)) {
+        _selectedRoles.remove(role);
+      } else {
+        _selectedRoles.add(role);
+      }
+    });
+  }
+
   void _submit() async {
     final isValid = _form.currentState!.validate();
 
     if (!isValid) {
-      return;
-    }
-
-    if (!_isLogin && _selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a profile picture.'),
-          backgroundColor: Colors.red,
-        ),
-      );
       return;
     }
 
@@ -111,81 +111,70 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
+        // For login, we need to select a role
+        if (_selectedRoles.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a role to continue.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+
         await _authService.signInWithEmailAndPassword(
           _enteredEmail,
           _enteredPassword,
         );
+
+        // After successful login, navigate based on selected role
+        if (mounted) {
+          if (_selectedRoles.contains('runner')) {
+            Navigator.of(context).pushReplacementNamed('/runner-home');
+          } else {
+            Navigator.of(context).pushReplacementNamed('/poster-home');
+          }
+        }
       } else {
+        // For signup, create user with both roles
         UserCredential userCredential = await _authService.signUpWithEmailAndPassword(
           _enteredEmail,
           _enteredPassword,
+          _enteredFirstName,
+          _enteredLastName,
+          _enteredGovernmentId,
+          ['runner', 'task_poster'], // Register with both roles
+          _selectedImage?.path, // Optional profile picture
         );
 
-        if (_selectedImage != null && userCredential.user != null) {
-          final appDir = await getApplicationDocumentsDirectory();
-          final fileName = path.basename(_selectedImage!.path);
-          final savedImage = await _selectedImage!.copy('${appDir.path}/$fileName');
-
-          // Pass the saved image path to RunnerHomeScreen
+        if (userCredential.user != null) {
           if (mounted) {
-            if (_selectedRole == 'runner') {
-              Navigator.of(context).pushReplacementNamed(
-                '/runner-home',
-                arguments: savedImage.path, // Pass image path as argument
-              );
-            } else {
-              Navigator.of(context).pushReplacementNamed('/poster-home');
-            }
-          }
-        } else {
-          // If no image is selected or user is null, navigate without image path
-          if (mounted) {
-            if (_selectedRole == 'runner') {
-              Navigator.of(context).pushReplacementNamed('/runner-home');
-            } else {
-              Navigator.of(context).pushReplacementNamed('/poster-home');
-            }
+            // After signup, show role selection dialog
+            _showRoleSelectionDialog();
           }
         }
-        // In a real app, you would also save _enteredFirstName, _enteredLastName, _enteredGovernmentId to Firebase Firestore.
       }
-
-      // On successful authentication, navigate to the appropriate home screen if not already navigated
-      if (mounted) {
-        if (_selectedRole == 'runner') {
-          Navigator.of(context).pushReplacementNamed('/runner-home');
-        } else {
-          Navigator.of(context).pushReplacementNamed('/poster-home');
-        }
-      }
-    } on FirebaseAuthException catch (e) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         String message = 'An error occurred, please check your credentials!';
-        if (e.code == 'user-not-found') {
+        if (e.toString().contains('user-not-found')) {
           message = 'No user found for that email.';
-        } else if (e.code == 'wrong-password') {
+        } else if (e.toString().contains('wrong-password')) {
           message = 'Wrong password provided for that user.';
-        } else if (e.code == 'email-already-in-use') {
+        } else if (e.toString().contains('email-already-in-use')) {
           message = 'The email address is already in use by another account.';
-        } else if (e.code == 'weak-password') {
+        } else if (e.toString().contains('weak-password')) {
           message = 'The password provided is too weak.';
-        } else if (e.code == 'invalid-email') {
+        } else if (e.toString().contains('invalid-email')) {
           message = 'The email address is not valid.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An unexpected error occurred: ${e.toString()}'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -197,6 +186,74 @@ class _AuthScreenState extends State<AuthScreen> {
         });
       }
     }
+  }
+
+  void _showRoleSelectionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Your Role'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please select how you want to use the app:'),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                InkWell(
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    if (mounted) {
+                      Navigator.of(context).pushReplacementNamed('/runner-home');
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.directions_run, color: Colors.blue.shade700),
+                        const SizedBox(height: 8),
+                        const Text('Runner'),
+                      ],
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    if (mounted) {
+                      Navigator.of(context).pushReplacementNamed('/poster-home');
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.assignment, color: Colors.green.shade700),
+                        const SizedBox(height: 8),
+                        const Text('Task Poster'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -263,24 +320,25 @@ class _AuthScreenState extends State<AuthScreen> {
                                           : null,
                                     ),
                                   ),
-                                  Positioned(
-                                    bottom: 10,
-                                    right: 10,
-                                    child: InkWell(
-                                      onTap: _showImagePickerDialog,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.secondaryContainer,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        padding: const EdgeInsets.all(8),
-                                        child: Icon(
-                                          Icons.edit,
-                                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                  if (_selectedImage != null)
+                                    Positioned(
+                                      bottom: 10,
+                                      right: 10,
+                                      child: InkWell(
+                                        onTap: _showImagePickerDialog,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.secondaryContainer,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          padding: const EdgeInsets.all(8),
+                                          child: Icon(
+                                            Icons.edit,
+                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -360,7 +418,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               labelText: 'Password',
                             ),
                             validator: (value) {
-                              _tempPassword = value; // Store password temporarily
+                              _tempPassword = value;
                               if (value == null || value.trim().length < 6) {
                                 return 'Password must be at least 6 characters long.';
                               }
@@ -398,16 +456,12 @@ class _AuthScreenState extends State<AuthScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedRole = 'runner';
-                                    });
-                                  },
+                                  onTap: () => _toggleRole('runner'),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 12, horizontal: 20),
                                     decoration: BoxDecoration(
-                                      color: _selectedRole == 'runner'
+                                      color: _selectedRoles.contains('runner')
                                           ? const Color(0xFF1DBF73)
                                           : Colors.grey.shade200,
                                       borderRadius: BorderRadius.circular(8),
@@ -415,14 +469,14 @@ class _AuthScreenState extends State<AuthScreen> {
                                     child: Column(
                                       children: [
                                         Icon(Icons.directions_run,
-                                            color: _selectedRole == 'runner'
+                                            color: _selectedRoles.contains('runner')
                                                 ? Colors.white
                                                 : Colors.black54),
                                         const SizedBox(height: 4),
                                         Text(
                                           'Runner',
                                           style: TextStyle(
-                                            color: _selectedRole == 'runner'
+                                            color: _selectedRoles.contains('runner')
                                                 ? Colors.white
                                                 : Colors.black54,
                                           ),
@@ -433,16 +487,12 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                                 const SizedBox(width: 20),
                                 InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedRole = 'task_poster';
-                                    });
-                                  },
+                                  onTap: () => _toggleRole('task_poster'),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 12, horizontal: 20),
                                     decoration: BoxDecoration(
-                                      color: _selectedRole == 'task_poster'
+                                      color: _selectedRoles.contains('task_poster')
                                           ? const Color(0xFF1DBF73)
                                           : Colors.grey.shade200,
                                       borderRadius: BorderRadius.circular(8),
@@ -450,14 +500,14 @@ class _AuthScreenState extends State<AuthScreen> {
                                     child: Column(
                                       children: [
                                         Icon(Icons.assignment,
-                                            color: _selectedRole == 'task_poster'
+                                            color: _selectedRoles.contains('task_poster')
                                                 ? Colors.white
                                                 : Colors.black54),
                                         const SizedBox(height: 4),
                                         Text(
                                           'Task Poster',
                                           style: TextStyle(
-                                            color: _selectedRole == 'task_poster'
+                                            color: _selectedRoles.contains('task_poster')
                                                 ? Colors.white
                                                 : Colors.black54,
                                           ),
@@ -476,7 +526,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             ElevatedButton(
                               onPressed: _submit,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1DBF73), // Button color
+                                backgroundColor: const Color(0xFF1DBF73),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 30, vertical: 15),
@@ -493,6 +543,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             onPressed: () {
                               setState(() {
                                 _isLogin = !_isLogin;
+                                _selectedRoles.clear();
                               });
                             },
                             child: Text(
