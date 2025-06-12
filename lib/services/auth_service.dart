@@ -9,6 +9,22 @@ class AuthService {
   // Get current user
   User? get currentUser => _auth.currentUser;
 
+  // Check if user is admin
+  Future<bool> isAdmin(String userId) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        List<String> roles = List<String>.from(data['roles'] ?? []);
+        return roles.contains('admin');
+      }
+      return false;
+    } catch (e) {
+      print('Error checking admin status: $e');
+      return false;
+    }
+  }
+
   // Sign up with email and password
   Future<UserCredential> signUpWithEmailAndPassword(
     String email,

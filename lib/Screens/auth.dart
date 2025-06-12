@@ -125,10 +125,20 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
 
-        await _authService.signInWithEmailAndPassword(
+        UserCredential userCredential = await _authService.signInWithEmailAndPassword(
           _enteredEmail,
           _enteredPassword,
         );
+
+        // Check if user is admin
+        bool isAdmin = await _authService.isAdmin(userCredential.user!.uid);
+        
+        if (isAdmin) {
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+          }
+          return;
+        }
 
         // After successful login, navigate based on selected role
         if (mounted) {
