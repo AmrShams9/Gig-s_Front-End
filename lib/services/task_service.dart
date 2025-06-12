@@ -109,4 +109,27 @@ class TaskService {
       ),
     ];
   }
-} 
+
+  // Placeholder for a method to create a new task
+  void createTask({
+    required String title,
+    required String description,
+    required String type,
+    double? price,
+    String? duration,
+    DateTime? startTime,
+    DateTime? endTime,
+  }) {
+    // In a real application, this would interact with a backend service (e.g., Firebase, REST API)
+    // to save the task data. For now, we just print it.
+    print('Creating Task:');
+    print('  Title: $title');
+    print('  Description: $description');
+    print('  Type: $type');
+    if (price != null) print('  Price: $price');
+    if (duration != null) print('  Duration: $duration');
+    if (startTime != null) print('  Start Time: $startTime');
+    if (endTime != null) print('  End Time: $endTime');
+    // You might also want to add this to a local list or state management for immediate UI updates
+  }
+}

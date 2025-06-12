@@ -1,7 +1,28 @@
 import 'package:flutter/material.dart';
+import '../services/task_service.dart'; // Import the task service
+import 'task_details_entry_screen.dart'; // Import the new screen
 
-class PostTaskScreen extends StatelessWidget {
+class PostTaskScreen extends StatefulWidget {
   const PostTaskScreen({super.key});
+
+  @override
+  State<PostTaskScreen> createState() => _PostTaskScreenState();
+}
+
+class _PostTaskScreenState extends State<PostTaskScreen> {
+  // These will be used in the new TaskDetailsEntryScreen, but declared here for now
+  // to demonstrate the flow.
+  // final _formKey = GlobalKey<FormState>();
+  // final TextEditingController _titleController = TextEditingController();
+  // final TextEditingController _descriptionController = TextEditingController();
+  // final TaskService _taskService = TaskService(); // Instantiate TaskService
+
+  @override
+  void dispose() {
+    // _titleController.dispose();
+    // _descriptionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,25 +106,25 @@ class PostTaskScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Handle Post Task button press
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1DBF73),
-                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        child: const Text(
-                          'Post Task',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                      // ElevatedButton(
+                      //   onPressed: () {
+                      //     // Handle Post Task button press - will be removed later
+                      //   },
+                      //   style: ElevatedButton.styleFrom(
+                      //     backgroundColor: const Color(0xFF1DBF73),
+                      //     padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      //     shape: RoundedRectangleBorder(
+                      //       borderRadius: BorderRadius.circular(30),
+                      //     ),
+                      //   ),
+                      //   child: const Text(
+                      //     'Post Task',
+                      //     style: TextStyle(
+                      //       fontSize: 18,
+                      //       color: Colors.white,
+                      //     ),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
@@ -153,7 +174,11 @@ class PostTaskScreen extends StatelessWidget {
   Widget _buildCategoryButton(BuildContext context, IconData icon, String label) {
     return OutlinedButton(
       onPressed: () {
-        // Handle category button press
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TaskDetailsEntryScreen(category: label),
+          ),
+        );
       },
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: Colors.grey.shade400),

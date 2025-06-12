@@ -13,6 +13,10 @@ class Task {
   final String additionalRequirements;
   final List<Question>? questions;
   final List<Offer>? offers;
+  final double? price;
+  final String? duration;
+  final DateTime? startTime;
+  final DateTime? endTime;
 
   Task({
     required this.taskId,
@@ -26,5 +30,9 @@ class Task {
     required this.additionalRequirements,
     this.questions,
     this.offers,
+    this.price,
+    this.duration,
+    this.startTime,
+    this.endTime,
   });
 } 
