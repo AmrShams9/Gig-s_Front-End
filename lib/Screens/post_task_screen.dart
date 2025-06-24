@@ -1,198 +1,88 @@
 import 'package:flutter/material.dart';
-import '../services/task_service.dart'; // Import the task service
-import 'task_details_entry_screen.dart'; // Import the new screen
+import 'package:intl/intl.dart';
+import '../models/task.dart';
+import '../services/task_service.dart';
+import 'task_form_screen.dart';
 
-class PostTaskScreen extends StatefulWidget {
+class PostTaskScreen extends StatelessWidget {
   const PostTaskScreen({super.key});
 
   @override
-  State<PostTaskScreen> createState() => _PostTaskScreenState();
-}
-
-class _PostTaskScreenState extends State<PostTaskScreen> {
-  // These will be used in the new TaskDetailsEntryScreen, but declared here for now
-  // to demonstrate the flow.
-  // final _formKey = GlobalKey<FormState>();
-  // final TextEditingController _titleController = TextEditingController();
-  // final TextEditingController _descriptionController = TextEditingController();
-  // final TaskService _taskService = TaskService(); // Instantiate TaskService
-
-  @override
-  void dispose() {
-    // _titleController.dispose();
-    // _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 350,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage('https://via.placeholder.com/400x350/1DBF73/FFFFFF?text=Background'), // Network Placeholder image
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 20,
-                  left: 0,
-                  right: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: const TextField(
-                              decoration: InputDecoration(
-                                hintText: '''What\'s next on your to-do list ?''',
-                                border: InputBorder.none,
-                                icon: Icon(Icons.search),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          child: const Icon(Icons.person, color: Colors.white),
-                        ),
-                      ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Post a Task'),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Choose a Category',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 50,
-                  left: 0,
-                  right: 0,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Describe your task.',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Review your offers.',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Get things done.',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      // ElevatedButton(
-                      //   onPressed: () {
-                      //     // Handle Post Task button press - will be removed later
-                      //   },
-                      //   style: ElevatedButton.styleFrom(
-                      //     backgroundColor: const Color(0xFF1DBF73),
-                      //     padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                      //     shape: RoundedRectangleBorder(
-                      //       borderRadius: BorderRadius.circular(30),
-                      //     ),
-                      //   ),
-                      //   child: const Text(
-                      //     'Post Task',
-                      //     style: TextStyle(
-                      //       fontSize: 18,
-                      //       color: Colors.white,
-                      //     ),
-                      //   ),
-                      // ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Post any task in seconds',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-          ),
-          Center(
-            child: Padding(
+            Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 3,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
                 children: [
                   _buildCategoryButton(context, Icons.delivery_dining, 'Delivery'),
                   _buildCategoryButton(context, Icons.handyman, 'Handyman'),
-                  _buildCategoryButton(context, Icons.format_paint, 'Painting'),
                   _buildCategoryButton(context, Icons.cleaning_services, 'Cleaning'),
-                  _buildCategoryButton(context, Icons.local_shipping, 'Hauling'),
-                  _buildCategoryButton(context, Icons.computer, 'Computer'),
-                  _buildCategoryButton(context, Icons.fitness_center, 'Heavy Lifting'),
-                  _buildCategoryButton(context, Icons.camera_alt, 'Photography'),
-                  _buildCategoryButton(context, Icons.people, 'Event Staffing'),
+                  _buildCategoryButton(context, Icons.local_shipping, 'Moving'),
+                  _buildCategoryButton(context, Icons.grass, 'Gardening'),
+                  _buildCategoryButton(context, Icons.computer, 'Tech'),
+                  _buildCategoryButton(context, Icons.shopping_cart, 'Shopping'),
+                  _buildCategoryButton(context, Icons.pets, 'Pet Care'),
+                  _buildCategoryButton(context, Icons.more_horiz, 'Other'),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryButton(BuildContext context, IconData icon, String label) {
-    return OutlinedButton(
-      onPressed: () {
+  Widget _buildCategoryButton(
+      BuildContext context, IconData icon, String label) {
+    return InkWell(
+      onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => TaskDetailsEntryScreen(category: label),
+            builder: (context) => TaskFormScreen(category: label),
           ),
         );
       },
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: Colors.grey.shade400),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
         ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 30, color: Colors.blueGrey),
-          const SizedBox(height: 5),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-        ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 36, color: Theme.of(context).primaryColor),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ),
     );
   }

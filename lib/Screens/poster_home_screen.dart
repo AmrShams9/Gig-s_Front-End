@@ -3,6 +3,7 @@ import '../widgets/task_poster_nav_bar.dart';
 import 'post_task_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import 'my_tasks_screen.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
@@ -11,24 +12,17 @@ class PosterHomeScreen extends StatefulWidget {
   State<PosterHomeScreen> createState() => _PosterHomeScreenState();
 }
 
-class _PosterHomeScreenState extends State<PosterHomeScreen> with SingleTickerProviderStateMixin {
+class _PosterHomeScreenState extends State<PosterHomeScreen> {
   int _selectedIndex = 0;
-  late final TabController _tasksTabController;
   final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
-    _tasksTabController = TabController(
-      length: 3,
-      vsync: this,
-      initialIndex: 0,
-    );
   }
 
   @override
   void dispose() {
-    _tasksTabController.dispose();
     super.dispose();
   }
 
@@ -38,110 +32,10 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> with SingleTickerPr
     });
   }
 
-  Widget _buildMyTasksTab() {
-    return Column(
-      children: [
-        Container(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          child: TabBar(
-            controller: _tasksTabController,
-            labelColor: Theme.of(context).colorScheme.primary,
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: Theme.of(context).colorScheme.primary,
-            tabs: const [
-              Tab(text: 'Active'),
-              Tab(text: 'Pending Approval'),
-              Tab(text: 'Paused'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tasksTabController,
-            children: [
-              // Active Tasks Tab
-              ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: 5, // Example count
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.green,
-                        child: Icon(Icons.check_circle, color: Colors.white),
-                      ),
-                      title: Text('Active Task ${index + 1}'),
-                      subtitle: const Text('In progress'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        onPressed: () {
-                          // Show task options
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Pending Approval Tab
-              ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: 3, // Example count
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.orange,
-                        child: Icon(Icons.pending, color: Colors.white),
-                      ),
-                      title: Text('Pending Task ${index + 1}'),
-                      subtitle: const Text('Waiting for approval'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        onPressed: () {
-                          // Show task options
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Paused Tab
-              ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: 2, // Example count
-                itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        backgroundColor: Colors.grey,
-                        child: Icon(Icons.pause, color: Colors.white),
-                      ),
-                      title: Text('Paused Task ${index + 1}'),
-                      subtitle: const Text('On hold'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        onPressed: () {
-                          // Show task options
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0:
-        return _buildMyTasksTab();
+        return const MyTasksScreen();
       case 1:
         return const PostTaskScreen();
       case 2:

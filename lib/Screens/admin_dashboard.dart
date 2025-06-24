@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
+import '../models/user.dart';
+import '../services/task_service.dart';
+import '../models/task.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -11,6 +15,8 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
+  final TaskService _taskService = TaskService();
   int _selectedIndex = 0;
 
   @override
@@ -98,28 +104,44 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 20),
           // Statistics Cards
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Calculate the number of columns based on screen width
-              int crossAxisCount = constraints.maxWidth > 1200 ? 4 : 
-                                 constraints.maxWidth > 800 ? 3 : 
-                                 constraints.maxWidth > 600 ? 2 : 1;
-              
-              return GridView.count(
-                crossAxisCount: crossAxisCount,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.5,
-                children: [
-                  _buildStatCard('Total Users', '0', Icons.people),
-                  _buildStatCard('Active Tasks', '0', Icons.assignment),
-                  _buildStatCard('Open Disputes', '0', Icons.warning),
-                  _buildStatCard('Completed Tasks', '0', Icons.check_circle),
-                  _buildStatCard('Total Revenue', '\$0', Icons.attach_money),
-                  _buildStatCard('Success Rate', '0%', Icons.trending_up),
-                ],
+          FutureBuilder<List<UserModel>>(
+            future: _userService.getAllUsers(),
+            builder: (context, userSnapshot) {
+              int totalUsers = 0;
+              if (userSnapshot.hasData) {
+                totalUsers = userSnapshot.data!.length;
+              }
+              return FutureBuilder<List<Task>>(
+                future: _taskService.getAllTasks(),
+                builder: (context, taskSnapshot) {
+                  int totalTasks = 0;
+                  if (taskSnapshot.hasData) {
+                    totalTasks = taskSnapshot.data!.length;
+                  }
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      int crossAxisCount = constraints.maxWidth > 1200 ? 4 :
+                        constraints.maxWidth > 800 ? 3 :
+                        constraints.maxWidth > 600 ? 2 : 1;
+                      return GridView.count(
+                        crossAxisCount: crossAxisCount,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.5,
+                        children: [
+                          _buildStatCard('Total Users', totalUsers.toString(), Icons.people),
+                          _buildStatCard('Total Tasks', totalTasks.toString(), Icons.assignment),
+                          _buildStatCard('Open Disputes', '0', Icons.warning),
+                          _buildStatCard('Completed Tasks', '0', Icons.check_circle),
+                          _buildStatCard('Total Revenue', '\$0', Icons.attach_money),
+                          _buildStatCard('Success Rate', '0%', Icons.trending_up),
+                        ],
+                      );
+                    },
+                  );
+                },
               );
             },
           ),
@@ -166,38 +188,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildUsersList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+    return FutureBuilder<List<UserModel>>(
+      future: _userService.getAllUsers(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Something went wrong'));
-        }
-
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return Center(child: Text('An error occurred: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('No users found.'));
+        }
 
+        final users = snapshot.data!;
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
+          itemCount: users.length,
           itemBuilder: (context, index) {
-            var userData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+            final user = users[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 leading: CircleAvatar(
-                  backgroundImage: userData['profileImageUrl'] != null
-                      ? NetworkImage(userData['profileImageUrl'])
+                  backgroundImage: user.profileImageUrl != null
+                      ? NetworkImage(user.profileImageUrl!)
                       : null,
-                  child: userData['profileImageUrl'] == null
+                  child: user.profileImageUrl == null
                       ? const Icon(Icons.person)
                       : null,
                 ),
-                title: Text('${userData['firstName']} ${userData['lastName']}'),
-                subtitle: Text(userData['email']),
+                title: Text('${user.firstName} ${user.lastName}'),
+                subtitle: Text(user.email),
+                trailing: Text(user.roles.join(', ')),
               ),
             );
           },
@@ -207,125 +234,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildDisputesList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('disputes').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Something went wrong'));
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No disputes found'));
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var disputeData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ExpansionTile(
-                title: Text('Dispute #${index + 1}'),
-                subtitle: Text(disputeData['status'] ?? 'Pending'),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Description: ${disputeData['description']}'),
-                        const SizedBox(height: 8),
-                        Text('Reported by: ${disputeData['reportedBy']}'),
-                        const SizedBox(height: 8),
-                        Text('Task ID: ${disputeData['taskId']}'),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                // Handle dispute resolution
-                              },
-                              child: const Text('Resolve'),
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton(
-                              onPressed: () {
-                                // Handle dispute dismissal
-                              },
-                              child: const Text('Dismiss'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+    return const Center(child: Text('Disputes section not implemented yet.'));
   }
 
   Widget _buildTasksList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Something went wrong'));
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No tasks found'));
-        }
-
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var taskData = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(taskData['title'] ?? 'Untitled Task'),
-                subtitle: Text(taskData['description'] ?? 'No description'),
-                trailing: Chip(
-                  label: Text(taskData['status'] ?? 'Unknown'),
-                  backgroundColor: _getStatusColor(taskData['status']),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Color _getStatusColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'completed':
-        return Colors.green.withOpacity(0.1);
-      case 'in progress':
-        return Colors.blue.withOpacity(0.1);
-      case 'pending':
-        return Colors.orange.withOpacity(0.1);
-      default:
-        return Colors.grey.withOpacity(0.1);
-    }
+    return const Center(child: Text('Tasks section not implemented yet.'));
   }
 }

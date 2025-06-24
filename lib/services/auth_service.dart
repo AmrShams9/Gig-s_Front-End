@@ -1,6 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/user.dart';
+import 'token_service.dart';
+import '../config/api_config.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -25,7 +30,149 @@ class AuthService {
     }
   }
 
-  // Sign up with email and password
+  // Register user with Spring backend
+  Future<Map<String, dynamic>> registerWithBackend({
+    required String username,
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String phoneNumber,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.registerEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'username': username,
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'password': password,
+          'phoneNumber': phoneNumber,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Handle non-JSON success response from backend
+        if (response.body.isEmpty || !response.body.trim().startsWith('{')) {
+          return {'success': true, 'data': response.body};
+        }
+        final responseData = jsonDecode(response.body);
+        return {
+          'success': true,
+          'data': responseData,
+        };
+      } else {
+        try {
+          final errorData = jsonDecode(response.body);
+          return {
+            'success': false,
+            'error': errorData['errorMessage'] ?? errorData['message'] ?? 'Registration failed',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'error': response.body,
+          };
+        }
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Network error: ${e.toString()}',
+      };
+    }
+  }
+
+  // Login user with Spring backend
+  Future<Map<String, dynamic>> loginWithBackend({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.loginEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
+
+      // Print the full response for debugging
+      print('Login Response Status: [32m${response.statusCode}[0m');
+      print('Login Response Body: [36m${response.body}[0m');
+
+      if (response.statusCode == 200) {
+        // Ensure the success response is valid JSON
+        if (response.body.isEmpty || !response.body.trim().startsWith('{')) {
+          return {
+            'success': false,
+            'error': 'Received an invalid response from the server.',
+          };
+        }
+        final responseData = jsonDecode(response.body);
+        final result = <String, dynamic>{
+          'success': true,
+          'data': responseData,
+          'token': responseData['access_token'],
+        };
+
+        // Try to get user_id from response, else fallback to numeric_id from JWT
+        String? userIdToStore;
+        if (responseData.containsKey('user_id')) {
+          userIdToStore = responseData['user_id'].toString();
+        } else if (responseData.containsKey('access_token')) {
+          String token = responseData['access_token'];
+          Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+          if (decodedToken.containsKey('numeric_id')) {
+            userIdToStore = decodedToken['numeric_id'].toString();
+          }
+        }
+        if (userIdToStore != null) {
+          await TokenService.storeUserId(userIdToStore);
+          print('Stored userId: ' + userIdToStore);
+        } else {
+          print('WARNING: No user_id or numeric_id found in login response or token.');
+        }
+
+        // Optionally, store the token as well
+        if (responseData.containsKey('access_token')) {
+          await TokenService.storeToken(responseData['access_token']);
+        }
+
+        return result;
+      } else {
+        // Handle error responses
+        var errorMessage = 'Login failed with status: ${response.statusCode}'; // Default error
+        if (response.body.isNotEmpty) {
+          try {
+            final errorData = jsonDecode(response.body);
+            errorMessage = errorData['errorMessage'] ?? errorData['message'] ?? response.body;
+          } catch (e) {
+            // The response body is not valid JSON. Use the raw string.
+            errorMessage = response.body;
+          }
+        }
+        return {
+          'success': false,
+          'error': errorMessage,
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Network error: ${e.toString()}',
+      };
+    }
+  }
+
+  // Sign up with email and password (keeping Firebase for now as fallback)
   Future<UserCredential> signUpWithEmailAndPassword(
     String email,
     String password,
@@ -76,7 +223,7 @@ class AuthService {
     }
   }
 
-  // Sign in with email and password
+  // Sign in with email and password (keeping Firebase for now as fallback)
   Future<UserCredential> signInWithEmailAndPassword(String email, String password) async {
     try {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
@@ -141,6 +288,9 @@ class AuthService {
 
   // Sign out
   Future<void> signOut() async {
+    // Clear stored token
+    await TokenService.clearAuthData();
+    // Sign out from Firebase (if still using it)
     return _auth.signOut();
   }
 }

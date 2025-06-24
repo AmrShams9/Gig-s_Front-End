@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../services/auth_service.dart';
+import '../services/token_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'package:jwt_decoder/jwt_decoder.dart';
 //firbasefirstore.instance.collection('users').doc(user id).set(username email imageurl,
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -20,15 +23,18 @@ class _AuthScreenState extends State<AuthScreen> {
   final _form = GlobalKey<FormState>();
   var _isLogin = true;
   var _enteredEmail = '';
+  var _enteredUsername = '';
   var _enteredPassword = '';
   var _enteredConfirmPassword = '';
   var _enteredFirstName = '';
   var _enteredLastName = '';
   var _enteredGovernmentId = '';
+  var _enteredPhoneNumber = '';
   File? _selectedImage;
   var _selectedRoles = <String>[]; // List to store selected roles
   var _isLoading = false;
   String? _tempPassword; // Add this line to store password temporarily
+  String? _authToken; // Store the authentication token
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -125,66 +131,132 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
 
-        UserCredential userCredential = await _authService.signInWithEmailAndPassword(
-          _enteredEmail,
-          _enteredPassword,
+        // Try Spring backend login first
+        final loginResult = await _authService.loginWithBackend(
+          username: _enteredUsername,
+          password: _enteredPassword,
         );
 
-        // Check if user is admin
-        bool isAdmin = await _authService.isAdmin(userCredential.user!.uid);
-        
-        if (isAdmin) {
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+        if (loginResult['success']) {
+          // Decode and print the token for debugging
+          final token = loginResult['token'];
+          if (token != null && token.isNotEmpty) {
+            final Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+            print('--- DECODED TOKEN ---');
+            print(jsonEncode(decodedToken));
+            print('---------------------');
           }
-          return;
-        }
 
-        // After successful login, navigate based on selected role
-        if (mounted) {
-          if (_selectedRoles.contains('runner')) {
-            Navigator.of(context).pushReplacementNamed('/runner-home');
-          } else {
-            Navigator.of(context).pushReplacementNamed('/poster-home');
+          // Ensure the token exists before proceeding
+          if (loginResult['token'] == null || loginResult['token'].isEmpty) {
+            if (mounted) {
+              final responseData = loginResult['data']?.toString() ?? 'No data received.';
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Login successful, but no token was found in the server response. Received: $responseData'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return;
+          }
+
+          // Check if a user ID is stored in TokenService
+          final storedUserId = await TokenService.getUserId();
+          if (storedUserId == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Login successful, but User ID could not be determined.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return;
+          }
+
+          // Hardcoded admin check
+          if (_enteredUsername.toLowerCase() == 'admin') {
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+            }
+            return;
+          }
+
+          // Check if user is admin (you might need to modify this based on your backend response)
+          bool isAdmin = false; // You'll need to implement this based on your backend
+
+          if (isAdmin) {
+            if (mounted) {
+              Navigator.of(context).pushReplacementNamed('/admin-dashboard');
+            }
+            return;
+          }
+
+          // After successful login, navigate based on selected role
+          if (mounted) {
+            if (_selectedRoles.contains('runner')) {
+              Navigator.of(context).pushReplacementNamed('/runner-home');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/poster-home');
+            }
+          }
+        } else {
+          // Show error message from backend
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(loginResult['error']),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
       } else {
-        // For signup, create user with both roles
-        UserCredential userCredential = await _authService.signUpWithEmailAndPassword(
-          _enteredEmail,
-          _enteredPassword,
-          _enteredFirstName,
-          _enteredLastName,
-          _enteredGovernmentId,
-          ['runner', 'task_poster'], // Register with both roles
-          _selectedImage?.path, // Optional profile picture
+        // For signup, use Spring backend
+        final registerResult = await _authService.registerWithBackend(
+          username: _enteredUsername,
+          firstName: _enteredFirstName,
+          lastName: _enteredLastName,
+          email: _enteredEmail,
+          password: _enteredPassword,
+          phoneNumber: _enteredPhoneNumber,
         );
 
-        if (userCredential.user != null) {
+        if (registerResult['success']) {
           if (mounted) {
-            // After signup, show role selection dialog
-            _showRoleSelectionDialog();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Registration successful! Please login.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            // Switch to login mode
+            setState(() {
+              _isLogin = true;
+              _selectedRoles.clear();
+            });
+          }
+        } else {
+          // Show error message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(registerResult['error']),
+                backgroundColor: Colors.red,
+              ),
+            );
           }
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
-        String message = 'An error occurred, please check your credentials!';
-        if (e.toString().contains('user-not-found')) {
-          message = 'No user found for that email.';
-        } else if (e.toString().contains('wrong-password')) {
-          message = 'Wrong password provided for that user.';
-        } else if (e.toString().contains('email-already-in-use')) {
-          message = 'The email address is already in use by another account.';
-        } else if (e.toString().contains('weak-password')) {
-          message = 'The password provided is too weak.';
-        } else if (e.toString().contains('invalid-email')) {
-          message = 'The email address is not valid.';
-        }
+        // Show the actual error instead of a generic message
+        final errorMessage = e.toString();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(message),
+            content: Text(errorMessage),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -387,6 +459,40 @@ class _AuthScreenState extends State<AuthScreen> {
                               },
                             ),
                             TextFormField(
+                              key: const ValueKey('email_signup'),
+                              keyboardType: TextInputType.emailAddress,
+                              autocorrect: false,
+                              textCapitalization: TextCapitalization.none,
+                              decoration: const InputDecoration(
+                                labelText: 'Email Address',
+                              ),
+                              validator: (value) {
+                                if (value == null || !value.contains('@')) {
+                                  return 'Please enter a valid email address.';
+                                }
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _enteredEmail = value!;
+                              },
+                            ),
+                            TextFormField(
+                              key: const ValueKey('phonenumber'),
+                              keyboardType: TextInputType.phone,
+                              decoration: const InputDecoration(
+                                labelText: 'Phone Number',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter your phone number.';
+                                }
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _enteredPhoneNumber = value!;
+                              },
+                            ),
+                            TextFormField(
                               key: const ValueKey('governmentid'),
                               keyboardType: TextInputType.text,
                               decoration: const InputDecoration(
@@ -404,21 +510,20 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ],
                           TextFormField(
-                            key: const ValueKey('email'),
-                            keyboardType: TextInputType.emailAddress,
+                            key: const ValueKey('username'),
                             autocorrect: false,
                             textCapitalization: TextCapitalization.none,
                             decoration: const InputDecoration(
-                              labelText: 'Email Address',
+                              labelText: 'Username',
                             ),
                             validator: (value) {
-                              if (value == null || !value.contains('@')) {
-                                return 'Please enter a valid email address.';
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your username.';
                               }
                               return null;
                             },
                             onSaved: (value) {
-                              _enteredEmail = value!;
+                              _enteredUsername = value!.trim();
                             },
                           ),
                           TextFormField(
@@ -435,7 +540,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               return null;
                             },
                             onSaved: (value) {
-                              _enteredPassword = value!;
+                              _enteredPassword = value!.trim();
                             },
                           ),
                           if (!_isLogin) ...[

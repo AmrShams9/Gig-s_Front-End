@@ -76,7 +76,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   Text(
-                    widget.task.taskPoster,
+                    widget.task.taskPoster.toString(),
                     style: const TextStyle(
                         fontSize: 16, color: Color(0xFF1DBF73)),
                   ),
@@ -97,7 +97,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    widget.task.additionalRequirements,
+                    'Location Details: ${widget.task.additionalRequirements?['location'] ?? 'Not specified'}',
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 16),

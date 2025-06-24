@@ -4,8 +4,7 @@ import 'Screens/runner_home_screen.dart';
 import 'Screens/poster_home_screen.dart';
 import 'Screens/admin_dashboard.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'services/auth_service.dart';
+import 'services/token_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,41 +25,26 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: StreamBuilder(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (ctx, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      home: FutureBuilder<bool>(
+        future: TokenService.isAuthenticated(),
+        builder: (ctx, authSnapshot) {
+          if (authSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
-          if (snapshot.hasData) {
-            return FutureBuilder<bool>(
-              future: AuthService().isAdmin(snapshot.data!.uid),
-              builder: (context, adminSnapshot) {
-                if (adminSnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                
-                if (adminSnapshot.data == true) {
-                  return const AdminDashboard();
-                }
-                
-                return const PosterHomeScreen();
-              },
-            );
+
+          if (authSnapshot.data == true) {
+            // If the user is authenticated, we can decide where to send them.
+            // For now, let's default to the RunnerHomeScreen to show the new screen.
+            return const RunnerHomeScreen();
           }
-          
+
+          // If not authenticated, show the login screen.
           return const AuthScreen();
         },
       ),
       routes: {
         '/auth': (context) => const AuthScreen(),
-        '/runner-home': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments as String?;
-          return RunnerHomeScreen(
-            profileImagePath: args ?? '',
-          );
-        },
+        '/runner-home': (context) => const RunnerHomeScreen(),
         '/poster-home': (context) => const PosterHomeScreen(),
         '/admin-dashboard': (context) => const AdminDashboard(),
       },

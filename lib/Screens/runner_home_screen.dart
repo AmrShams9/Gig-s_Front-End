@@ -8,14 +8,10 @@ import '../widgets/task_card.dart';
 import '../widgets/my_tasks_card.dart';
 import '../models/task.dart';
 import 'task_detail_screen.dart';
+import 'auth.dart';
 
 class RunnerHomeScreen extends StatefulWidget {
-  final String profileImagePath;
-
-  const RunnerHomeScreen({
-    Key? key,
-    required this.profileImagePath,
-  }) : super(key: key);
+  const RunnerHomeScreen({super.key});
 
   @override
   State<RunnerHomeScreen> createState() => _RunnerHomeScreenState();
@@ -25,7 +21,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
-  List<Task> _availableTasks = [];
+  late Future<List<Task>> _tasksFuture;
   String _selectedCategory = 'All';
 
   final List<Map<String, dynamic>> _categories = [
@@ -42,13 +38,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadTasks();
-  }
-
-  void _loadTasks() {
-    setState(() {
-      _availableTasks = _taskService.getDummyTasks();
-    });
+    _tasksFuture = _taskService.getAllTasks();
   }
 
   void _onItemTapped(int index) {
@@ -63,6 +53,16 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
         builder: (ctx) => TaskDetailScreen(task: task),
       ),
     );
+  }
+
+  Future<void> _logout() async {
+    await _authService.signOut();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const AuthScreen()),
+        (Route<dynamic> route) => false,
+      );
+    }
   }
 
   Widget _buildCategoryButtons() {
@@ -124,18 +124,42 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           children: [
             _buildCategoryButtons(),
             Expanded(
-              child: ListView.builder(
-                itemCount: _availableTasks.length,
-                itemBuilder: (context, index) {
-                  final task = _availableTasks[index];
-                  if (_selectedCategory == 'All' || task.type == _selectedCategory) {
-                    return TaskCard(
-                      task: task,
-                      onTap: () => _handleTaskTap(task),
-                    );
-                  }
-                  return const SizedBox.shrink();
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  setState(() {
+                    _tasksFuture = _taskService.getAllTasks();
+                  });
                 },
+                child: FutureBuilder<List<Task>>(
+                  future: _tasksFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('An error occurred: ${snapshot.error}'));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                          child: Text('No tasks available at the moment.'));
+                    }
+
+                    final tasks = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = tasks[index];
+                        if (_selectedCategory == 'All' || task.type == _selectedCategory) {
+                          return TaskCard(
+                            task: task,
+                            onTap: () => _handleTaskTap(task),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -204,62 +228,46 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Available Tasks'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await _logout();
+              } else if (value == 'profile') {
+                // Handle profile navigation
+                print('Navigate to Profile');
+              } else if (value == 'settings') {
+                // Handle settings navigation
+                print('Navigate to Settings');
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: Text('Profile'),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: Text('Settings'),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Text('Logout'),
+              ),
+            ],
+            child: const CircleAvatar(
+              radius: 16,
+              child: Icon(Icons.person),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  CircleAvatar(
-                    backgroundImage: FileImage(File(widget.profileImagePath)),
-                    radius: 16,
-                  ),
-                  PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'logout') {
-                        try {
-                          await _authService.signOut();
-                          if (mounted) {
-                            Navigator.of(context).pushReplacementNamed('/auth');
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error signing out: ${e.toString()}'),
-                                backgroundColor: Theme.of(context).colorScheme.error,
-                              ),
-                            );
-                          }
-                        }
-                      } else if (value == 'profile') {
-                        // Handle profile navigation
-                        print('Navigate to Profile');
-                      } else if (value == 'settings') {
-                        // Handle settings navigation
-                        print('Navigate to Settings');
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem(
-                        value: 'profile',
-                        child: Text('Profile'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'settings',
-                        child: Text('Settings'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'logout',
-                        child: Text('Logout'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
             Expanded(
               child: _buildBody(),
             ),

@@ -40,16 +40,18 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      id: map['id'] ?? '',
+      id: map['id']?.toString() ?? '',
       email: map['email'] ?? '',
-      firstName: map['firstName'] ?? '',
+      firstName: map['firstName'] ?? map['username'] ?? '',
       lastName: map['lastName'] ?? '',
       governmentId: map['governmentId'] ?? '',
       roles: List<String>.from(map['roles'] ?? []),
       profileImageUrl: map['profileImageUrl'],
       rating: (map['rating'] ?? 0.0).toDouble(),
       completedTasks: map['completedTasks'] ?? 0,
-      createdAt: DateTime.parse(map['createdAt']),
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'])
+          : DateTime.now(),
     );
   }
 
