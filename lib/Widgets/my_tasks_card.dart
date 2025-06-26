@@ -9,6 +9,7 @@ class MyTasksCard extends StatelessWidget {
   final String taskPoster;
   final String taskPosterImage;
   final VoidCallback onTap;
+  final VoidCallback? onCancel;
 
   const MyTasksCard({
     Key? key,
@@ -20,6 +21,7 @@ class MyTasksCard extends StatelessWidget {
     required this.taskPoster,
     this.taskPosterImage = 'https://via.placeholder.com/50',
     required this.onTap,
+    this.onCancel,
   }) : super(key: key);
 
   @override
@@ -46,7 +48,22 @@ class MyTasksCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _buildStatusChip(status),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildStatusChip(status),
+                      if (onCancel != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+                          tooltip: 'Cancel Offer',
+                          onPressed: onCancel,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),

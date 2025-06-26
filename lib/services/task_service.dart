@@ -190,7 +190,7 @@ class TaskService {
       'taskId': taskId,
       'runnerId': runnerId,
       'amount': amount,
-      'message': message,
+      'comment': message,
     });
     try {
       final response = await http.post(
@@ -264,7 +264,7 @@ class TaskService {
   Future<Map<String, dynamic>> deleteOffer(String offerId) async {
     final token = await TokenService.getToken();
     final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
-    final url = Uri.parse('$baseUrl/api/offers/$offerId');
+    final url = Uri.parse('$baseUrl/api/offers/$offerId/cancel');
     try {
       final response = await http.delete(
         url,
@@ -291,7 +291,7 @@ class TaskService {
   Future<Task> getTaskById(String taskId) async {
     final token = await TokenService.getToken();
     final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
-    final url = Uri.parse('$baseUrl/api/tasks/$taskId');
+    final url = Uri.parse('$baseUrl/api/tasks/regular/$taskId');
     try {
       final response = await http.get(
         url,

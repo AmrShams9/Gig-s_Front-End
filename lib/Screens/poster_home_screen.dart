@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import '../services/token_service.dart';
 import 'task_form_screen.dart';
 import 'Chat_messages.dart';
+import '../services/user_service.dart';
+import '../models/user.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
@@ -23,6 +25,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
+  final UserService _userService = UserService();
   late Future<List<Task>> _tasksFuture;
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Moving', 'icon': Icons.local_shipping},
@@ -34,11 +37,26 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     {'name': 'Technology', 'icon': Icons.computer},
     {'name': 'Gardening', 'icon': Icons.grass},
   ];
+  Map<String, UserModel> _userMap = {};
+  bool _usersLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _tasksFuture = _loadTasks();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    try {
+      final users = await _userService.getAllUsers();
+      setState(() {
+        _userMap = {for (var u in users) u.id: u};
+        _usersLoaded = true;
+      });
+    } catch (_) {
+      setState(() { _usersLoaded = true; });
+    }
   }
 
   Future<List<Task>> _loadTasks() async {
@@ -182,7 +200,6 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () async {
-                    // Show offers in a dialog (placeholder)
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -207,11 +224,13 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                                 itemCount: offers.length,
                                 itemBuilder: (context, i) {
                                   final offer = offers[i];
+                                  final user = _userMap[offer.runnerId];
+                                  final runnerName = user != null ? '${user.firstName} ${user.lastName}'.trim() : 'Runner #${offer.runnerId}';
                                   return ListTile(
                                     leading: const CircleAvatar(
                                       backgroundImage: AssetImage('assets/images/placeholder_profile.jpg'),
                                     ),
-                                    title: Text('Runner #${offer.runnerId}'),
+                                    title: Text(runnerName),
                                     subtitle: Text(offer.message),
                                     trailing: Text(' ${offer.amount.toStringAsFixed(2)}'),
                                   );

@@ -58,10 +58,9 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     List<Map<String, dynamic>> result = [];
     for (final offer in offers) {
       try {
-        final task = await _taskService.getTaskById(offer.id); // You may need to implement getTaskById
+        final task = await _taskService.getTaskById(offer.taskId ?? offer.id);
         result.add({'offer': offer, 'task': task});
       } catch (_) {
-        // If task fetch fails, skip or add with null
         result.add({'offer': offer, 'task': null});
       }
     }
@@ -221,19 +220,43 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                 final offer = data[index]['offer'] as Offer;
                 final task = data[index]['task'] as Task?;
                 if (task == null) {
-                  return ListTile(title: Text('Task not found for offer ${offer.id}'));
+                  return ListTile(title: Text('Task not found for offer \\${offer.id}'));
                 }
-                return MyTasksCard(
-                  taskTitle: task.title,
-                  taskType: task.type,
-                  status: offer.message, // You may want to map offer.status here
-                  deadline: task.startTime ?? DateTime.now(),
-                  offerAmount: offer.amount,
-                  taskPoster: task.taskPoster.toString(),
-                  onTap: () {},
-                  taskPosterImage: 'https://via.placeholder.com/50',
-                  // Add a delete button
-                  // You may want to extend MyTasksCard to accept a delete callback
+                return Column(
+                  children: [
+                    MyTasksCard(
+                      taskTitle: task.title,
+                      taskType: task.type,
+                      status: offer.message, // You may want to map offer.status here
+                      deadline: task.startTime ?? DateTime.now(),
+                      offerAmount: offer.amount,
+                      taskPoster: task.taskPoster.toString(),
+                      onTap: () {},
+                      taskPosterImage: 'https://via.placeholder.com/50',
+                      onCancel: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Cancel Offer'),
+                            content: const Text('Are you sure you want to cancel this offer?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('No'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('Yes, Cancel'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          await _deleteOffer(offer.id);
+                        }
+                      },
+                    ),
+                  ],
                 );
               },
             );

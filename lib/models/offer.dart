@@ -4,6 +4,7 @@ class Offer {
   final double amount;
   final String message;
   final DateTime timestamp;
+  final String? taskId;
 
   Offer({
     required this.id,
@@ -11,6 +12,7 @@ class Offer {
     required this.amount,
     required this.message,
     required this.timestamp,
+    this.taskId,
   });
 
   factory Offer.fromJson(Map<String, dynamic> json) {
@@ -24,12 +26,14 @@ class Offer {
     } catch (_) {
       timestamp = DateTime.now();
     }
+    String? taskId = json['taskId']?.toString() ?? json['task_id']?.toString();
     return Offer(
       id: id,
       runnerId: runnerId,
       amount: amount,
       message: message,
       timestamp: timestamp,
+      taskId: taskId,
     );
   }
 } 
