@@ -9,6 +9,8 @@ import '../widgets/my_tasks_card.dart';
 import '../models/task.dart';
 import 'task_detail_screen.dart';
 import 'auth.dart';
+import '../models/offer.dart';
+import '../services/token_service.dart';
 
 class RunnerHomeScreen extends StatefulWidget {
   const RunnerHomeScreen({super.key});
@@ -23,6 +25,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   final TaskService _taskService = TaskService();
   late Future<List<Task>> _tasksFuture;
   String _selectedCategory = 'All';
+  Future<List<Map<String, dynamic>>>? _myOffersFuture;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'All', 'icon': Icons.all_inclusive},
@@ -39,6 +42,40 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   void initState() {
     super.initState();
     _tasksFuture = _taskService.getAllTasks();
+    _loadMyOffers();
+  }
+
+  Future<void> _loadMyOffers() async {
+    final runnerId = await TokenService.getUserId();
+    if (runnerId == null) return;
+    setState(() {
+      _myOffersFuture = _fetchOffersWithTasks(runnerId);
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchOffersWithTasks(String runnerId) async {
+    final offers = await _taskService.getOffersByRunner(runnerId);
+    List<Map<String, dynamic>> result = [];
+    for (final offer in offers) {
+      try {
+        final task = await _taskService.getTaskById(offer.id); // You may need to implement getTaskById
+        result.add({'offer': offer, 'task': task});
+      } catch (_) {
+        // If task fetch fails, skip or add with null
+        result.add({'offer': offer, 'task': null});
+      }
+    }
+    return result;
+  }
+
+  Future<void> _deleteOffer(String offerId) async {
+    final result = await _taskService.deleteOffer(offerId);
+    if (result['success']) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer deleted.')));
+      _loadMyOffers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete offer: ${result['error']}')));
+    }
   }
 
   void _onItemTapped(int index) {
@@ -164,7 +201,45 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
             ),
           ],
         );
-      case 1: // Assigned Tasks
+      case 1: // My Offers
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _myOffersFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+            final data = snapshot.data ?? [];
+            if (data.isEmpty) {
+              return const Center(child: Text('You have not made any offers yet.'));
+            }
+            return ListView.builder(
+              itemCount: data.length,
+              itemBuilder: (context, index) {
+                final offer = data[index]['offer'] as Offer;
+                final task = data[index]['task'] as Task?;
+                if (task == null) {
+                  return ListTile(title: Text('Task not found for offer ${offer.id}'));
+                }
+                return MyTasksCard(
+                  taskTitle: task.title,
+                  taskType: task.type,
+                  status: offer.message, // You may want to map offer.status here
+                  deadline: task.startTime ?? DateTime.now(),
+                  offerAmount: offer.amount,
+                  taskPoster: task.taskPoster.toString(),
+                  onTap: () {},
+                  taskPosterImage: 'https://via.placeholder.com/50',
+                  // Add a delete button
+                  // You may want to extend MyTasksCard to accept a delete callback
+                );
+              },
+            );
+          },
+        );
+      case 2: // Assigned Tasks
         return ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
@@ -206,15 +281,15 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
             ),
           ],
         );
-      case 2: // Stats
+      case 3: // Stats
         return const Center(
           child: Text('Stats'),
         );
-      case 3: // Notifications
+      case 4: // Notifications
         return const Center(
           child: Text('Notifications'),
         );
-      case 4: // Chat
+      case 5: // Chat
         return const Center(
           child: Text('Chat'),
         );

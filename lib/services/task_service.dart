@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import '../models/task.dart';
 import '../config/api_config.dart';
 import 'token_service.dart';
+import 'dart:io';
+import '../models/offer.dart';
 
 class TaskService {
   List<Task> getDummyTasks() {
@@ -172,6 +174,139 @@ class TaskService {
         'success': false,
         'error': 'An error occurred: ${e.toString()}',
       };
+    }
+  }
+
+  Future<Map<String, dynamic>> postOffer({
+    required int taskId,
+    required int runnerId,
+    required double amount,
+    required String message,
+  }) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers');
+    final body = jsonEncode({
+      'taskId': taskId,
+      'runnerId': runnerId,
+      'amount': amount,
+      'message': message,
+    });
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: body,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error': 'Failed to post offer. Status: \u001b[31m[0m${response.statusCode}, Body: ${response.body}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<List<Offer>> getOffersForTask(int taskId) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers/task/$taskId');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Offer.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load offers. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('An error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<List<Offer>> getOffersByRunner(String runnerId) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers/runner/$runnerId');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Offer.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load offers. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('An error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteOffer(String offerId) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers/$offerId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error': 'Failed to delete offer. Status: ${response.statusCode}, Body: ${response.body}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Task> getTaskById(String taskId) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
+    final url = Uri.parse('$baseUrl/api/tasks/$taskId');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Task.fromJson(data);
+      } else {
+        throw Exception('Failed to load task. Status: ${response.statusCode}, Body: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('An error occurred: ${e.toString()}');
     }
   }
 }

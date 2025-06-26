@@ -20,20 +20,24 @@ class Navbar extends StatelessWidget {
       type: BottomNavigationBarType.fixed,
       items: const [
         BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
           icon: Icon(Icons.assignment),
           label: 'My Tasks',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.post_add),
-          label: 'Post Task',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.analytics),
-          label: 'Analytics',
+          icon: Icon(Icons.local_offer),
+          label: 'Offers',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.chat),
-          label: 'Chat',
+          label: 'Messages',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
         ),
       ],
     );
