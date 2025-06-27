@@ -170,7 +170,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   content: Text('Login successful, but User ID could not be determined.'),
                   backgroundColor: Colors.red,
                 ),
-              );
+        );
             }
             return;
           }
@@ -193,15 +193,15 @@ class _AuthScreenState extends State<AuthScreen> {
             return;
           }
 
-          // After successful login, navigate based on selected role
-          if (mounted) {
-            if (_selectedRoles.contains('runner')) {
-              Navigator.of(context).pushReplacementNamed('/runner-home');
-            } else {
-              Navigator.of(context).pushReplacementNamed('/poster-home');
-            }
+        // After successful login, navigate based on selected role
+        if (mounted) {
+          if (_selectedRoles.contains('runner')) {
+            Navigator.of(context).pushReplacementNamed('/runner-home');
+          } else {
+            Navigator.of(context).pushReplacementNamed('/poster-home');
           }
-        } else {
+        }
+      } else {
           // Show error message from backend
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

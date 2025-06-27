@@ -15,15 +15,15 @@ class PostTaskScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
                 'Choose a Category',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.bold,
                     ),
               ),
             ),
@@ -46,10 +46,10 @@ class PostTaskScreen extends StatelessWidget {
                   _buildCategoryButton(context, Icons.pets, 'Pet Care'),
                   _buildCategoryButton(context, Icons.more_horiz, 'Other'),
                 ],
-              ),
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
+          const SizedBox(height: 20),
+        ],
         ),
       ),
     );
@@ -70,10 +70,10 @@ class PostTaskScreen extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.shade300),
           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
             Icon(icon, size: 36, color: Theme.of(context).primaryColor),
             const SizedBox(height: 8),
             Text(
@@ -81,7 +81,7 @@ class PostTaskScreen extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
-          ],
+        ],
         ),
       ),
     );

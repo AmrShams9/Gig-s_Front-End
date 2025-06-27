@@ -11,6 +11,12 @@ import 'task_detail_screen.dart';
 import 'auth.dart';
 import '../models/offer.dart';
 import '../services/token_service.dart';
+import '../Screens/chat_page.dart';
+import '../services/chat_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart';
+import '../models/user.dart';
+import '../Widgets/chat_card.dart';
 
 class RunnerHomeScreen extends StatefulWidget {
   const RunnerHomeScreen({super.key});
@@ -183,16 +189,16 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     final tasks = snapshot.data!;
                     return ListView.builder(
                       itemCount: tasks.length,
-                      itemBuilder: (context, index) {
+                itemBuilder: (context, index) {
                         final task = tasks[index];
-                        if (_selectedCategory == 'All' || task.type == _selectedCategory) {
-                          return TaskCard(
-                            task: task,
-                            onTap: () => _handleTaskTap(task),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
+                  if (_selectedCategory == 'All' || task.type == _selectedCategory) {
+                    return TaskCard(
+                      task: task,
+                      onTap: () => _handleTaskTap(task),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
                     );
                   },
                 ),
@@ -309,12 +315,120 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           child: Text('Stats'),
         );
       case 4: // Notifications
-        return const Center(
-          child: Text('Notifications'),
+        final myUserIdFuture = TokenService.getUserId();
+        return FutureBuilder<String?>(
+          future: myUserIdFuture,
+          builder: (context, snapshot) {
+            final myUserId = snapshot.data;
+            if (myUserId == null) return const Center(child: CircularProgressIndicator());
+            return StreamBuilder<QuerySnapshot>(
+              stream: ChatService().getUserChats(myUserId),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final docs = snapshot.data!.docs;
+                if (docs.isEmpty) return const Center(child: Text('No chats yet.'));
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, i) {
+                    final data = docs[i].data() as Map<String, dynamic>;
+                    final users = List<String>.from(data['users']);
+                    final otherUserId = users.firstWhere((id) => id != myUserId, orElse: () => '');
+                    final lastMessage = data['lastMessage'] ?? '';
+                    final lastTimestamp = data['lastTimestamp'] != null
+                        ? (data['lastTimestamp'] as Timestamp).toDate()
+                        : null;
+                    return FutureBuilder<UserModel?>(
+                      future: AuthService().getUserData(otherUserId),
+                      builder: (context, userSnapshot) {
+                        final user = userSnapshot.data;
+                        final fullName = user != null
+                            ? '${user.firstName} ${user.lastName}'
+                            : 'User $otherUserId';
+                        final avatarUrl = user?.profileImageUrl ?? 'https://via.placeholder.com/50';
+                        final timeStr = lastTimestamp != null
+                            ? '${lastTimestamp.hour}:${lastTimestamp.minute.toString().padLeft(2, '0')}'
+                            : '';
+                        return ChatCard(
+                          name: fullName,
+                          lastMessage: lastMessage,
+                          time: timeStr,
+                          avatarUrl: avatarUrl,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatPage(
+                                  otherUserId: otherUserId,
+                                  otherUserName: fullName,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
         );
-      case 5: // Chat
-        return const Center(
-          child: Text('Chat'),
+      case 5: // Chat (Messages)
+        final myUserIdFuture = TokenService.getUserId();
+        return FutureBuilder<String?>(
+          future: myUserIdFuture,
+          builder: (context, snapshot) {
+            final myUserId = snapshot.data;
+            if (myUserId == null) return const Center(child: CircularProgressIndicator());
+            return StreamBuilder<QuerySnapshot>(
+              stream: ChatService().getUserChats(myUserId),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final docs = snapshot.data!.docs;
+                if (docs.isEmpty) return const Center(child: Text('No chats yet.'));
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, i) {
+                    final data = docs[i].data() as Map<String, dynamic>;
+                    final users = List<String>.from(data['users']);
+                    final otherUserId = users.firstWhere((id) => id != myUserId, orElse: () => '');
+                    final lastMessage = data['lastMessage'] ?? '';
+                    final lastTimestamp = data['lastTimestamp'] != null
+                        ? (data['lastTimestamp'] as Timestamp).toDate()
+                        : null;
+                    return FutureBuilder<UserModel?>(
+                      future: AuthService().getUserData(otherUserId),
+                      builder: (context, userSnapshot) {
+                        final user = userSnapshot.data;
+                        final fullName = user != null
+                            ? '${user.firstName} ${user.lastName}'
+                            : 'User $otherUserId';
+                        final avatarUrl = user?.profileImageUrl ?? 'https://via.placeholder.com/50';
+                        final timeStr = lastTimestamp != null
+                            ? '${lastTimestamp.hour}:${lastTimestamp.minute.toString().padLeft(2, '0')}'
+                            : '';
+                        return ChatCard(
+                          name: fullName,
+                          lastMessage: lastMessage,
+                          time: timeStr,
+                          avatarUrl: avatarUrl,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatPage(
+                                  otherUserId: otherUserId,
+                                  otherUserName: fullName,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
         );
       default:
         return const Center(
@@ -329,40 +443,40 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
       appBar: AppBar(
         title: const Text('Available Tasks'),
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'logout') {
+                  PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      if (value == 'logout') {
                 await _logout();
-              } else if (value == 'profile') {
-                // Handle profile navigation
-                print('Navigate to Profile');
-              } else if (value == 'settings') {
-                // Handle settings navigation
-                print('Navigate to Settings');
-              }
-            },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: 'profile',
-                child: Text('Profile'),
-              ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: Text('Settings'),
-              ),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Text('Logout'),
-              ),
-            ],
+                      } else if (value == 'profile') {
+                        // Handle profile navigation
+                        print('Navigate to Profile');
+                      } else if (value == 'settings') {
+                        // Handle settings navigation
+                        print('Navigate to Settings');
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => [
+                      const PopupMenuItem(
+                        value: 'profile',
+                        child: Text('Profile'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'settings',
+                        child: Text('Settings'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Text('Logout'),
+                      ),
+                    ],
             child: const CircleAvatar(
               radius: 16,
               child: Icon(Icons.person),
             ),
-          ),
+                  ),
           const SizedBox(width: 16),
-        ],
-      ),
+                ],
+              ),
       body: SafeArea(
         child: Column(
           children: [

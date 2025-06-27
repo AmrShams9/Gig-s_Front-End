@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
+import '../Screens/Chat_messages.dart';
+import '../Screens/chat_page.dart';
+import '../services/token_service.dart';
 
 class OffersCard extends StatelessWidget {
   final String profileImage;
   final String runnerName;
+  final String? runnerId;
   final double amount;
   final String message;
   final DateTime timestamp;
   final double rating;
+  final VoidCallback? onAccept;
 
   const OffersCard({
     Key? key,
     this.profileImage = 'https://via.placeholder.com/50',
     this.runnerName = 'John Doe',
+    this.runnerId,
     this.amount = 0.0,
     this.message = '',
     required this.timestamp,
     this.rating = 4.5,
+    this.onAccept,
   }) : super(key: key);
 
   @override
@@ -102,6 +109,49 @@ class OffersCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check_circle, size: 18, color: Colors.white),
+                      label: const Text('Accept Offer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF1DBF73),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: onAccept,
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.chat, size: 18, color: Colors.white),
+                      label: const Text('Send Message'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF25D366), // WhatsApp green
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (runnerId != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ChatPage(
+                                otherUserId: runnerId!,
+                                otherUserName: runnerName,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
                 Icon(
                   Icons.access_time,
                   size: 14,

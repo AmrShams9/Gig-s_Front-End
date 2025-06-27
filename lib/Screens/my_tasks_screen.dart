@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
 import '../services/token_service.dart';
+import 'poster_home_screen.dart';
 
 class MyTasksScreen extends StatefulWidget {
   const MyTasksScreen({super.key});
@@ -354,7 +355,7 @@ class _MyTaskCardState extends State<MyTaskCard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '24${task.amount.toStringAsFixed(2)}',
+                    '${task.amount.toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: Color(0xFF1DBF73),
                       fontSize: 12,
@@ -448,6 +449,29 @@ class _MyTaskCardState extends State<MyTaskCard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.local_offer, color: Colors.blue),
+                  label: const Text('View Offers'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade50,
+                    foregroundColor: Colors.blue.shade700,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    print('[DEBUG] View Offers clicked for taskId: \'${widget.task.taskId}\'');
+                    if (widget.task.taskId != null) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => OffersListScreen(taskId: widget.task.taskId!),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   onPressed: widget.onDelete,

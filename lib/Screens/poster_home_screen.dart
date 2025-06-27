@@ -13,9 +13,18 @@ import 'task_form_screen.dart';
 import 'Chat_messages.dart';
 import '../services/user_service.dart';
 import '../models/user.dart';
+import '../widgets/offers_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/chat_service.dart';
+import '../Screens/chat_page.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
+
+  static void showOffersForTask(BuildContext context, String taskId) {
+    final state = context.findAncestorStateOfType<_PosterHomeScreenState>();
+    state?._showOffersForTask(taskId);
+  }
 
   @override
   State<PosterHomeScreen> createState() => _PosterHomeScreenState();
@@ -23,6 +32,7 @@ class PosterHomeScreen extends StatefulWidget {
 
 class _PosterHomeScreenState extends State<PosterHomeScreen> {
   int _selectedIndex = 0;
+  String? _selectedTaskIdForOffers;
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
   final UserService _userService = UserService();
@@ -106,9 +116,9 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
             Text('$count', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(fontSize: 12)),
-          ],
+            ],
+          ),
         ),
-      ),
     );
   }
 
@@ -139,10 +149,10 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                 const SizedBox(height: 4),
                 Text(cat['name'], style: const TextStyle(fontSize: 12)),
               ],
-            ),
-          );
-        },
-      ),
+                    ),
+                  );
+                },
+              ),
     );
   }
 
@@ -151,7 +161,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
       future: _getOffersCount(task.taskId ?? '0'),
       builder: (context, snapshot) {
         final offersCount = snapshot.data ?? 0;
-        return Card(
+                  return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           elevation: 2,
           child: Padding(
@@ -160,7 +170,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: ListTile(
+                    child: ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -211,7 +221,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                               return const Center(child: CircularProgressIndicator());
                             }
                             if (snapshot.hasError) {
-                              return Text('Error: \\n${snapshot.error}');
+                              return Text('Error: \n${snapshot.error}');
                             }
                             final offers = snapshot.data ?? [];
                             if (offers.isEmpty) {
@@ -232,22 +242,22 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                                     ),
                                     title: Text(runnerName),
                                     subtitle: Text(offer.message),
-                                    trailing: Text(' ${offer.amount.toStringAsFixed(2)}'),
+                                    trailing: Text('${offer.amount.toStringAsFixed(2)}'),
                                   );
                                 },
-                              ),
-                            );
-                          },
-                        ),
+                    ),
+                  );
+                },
+              ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
                             child: const Text('Close'),
                           ),
                         ],
-                      ),
-                    );
-                  },
+                    ),
+                  );
+                },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade50,
                     foregroundColor: Colors.blue.shade700,
@@ -257,10 +267,10 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text('Show Offers'),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
         );
       },
     );
@@ -279,7 +289,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
         final tasks = snapshot.data ?? [];
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          children: [
+            children: [
             _buildSummaryCards(tasks),
             const SizedBox(height: 16),
             Padding(
@@ -302,12 +312,117 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   }
 
   Widget _buildOffersTab() {
-    // Placeholder for offers tab
-    return const Center(child: Text('Offers tab coming soon!'));
+    if (_selectedTaskIdForOffers == null) {
+      return const Center(child: Text('Select a task to view offers.'));
+    }
+    return FutureBuilder<List<Offer>>(
+      key: ValueKey(_selectedTaskIdForOffers),
+      future: _taskService.getOffersForTask(int.parse(_selectedTaskIdForOffers!)),
+      builder: (context, snapshot) {
+        print('[DEBUG] FutureBuilder rebuilding for taskId: $_selectedTaskIdForOffers');
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: \n${snapshot.error}'));
+        }
+        final offers = snapshot.data ?? [];
+        print('Offers received: ' + offers.toString());
+        if (offers.isEmpty) {
+          return const Center(child: Text('No offers for this task.'));
+        }
+        return ListView.builder(
+          itemCount: offers.length,
+          itemBuilder: (context, i) {
+            final offer = offers[i];
+            final runnerName = offer is Offer ? 'Runner #${offer.runnerId}' : 'Unknown Runner';
+            final amount = offer is Offer ? offer.amount : 0.0;
+            final message = offer is Offer ? offer.message : '';
+            final timestamp = offer is Offer ? offer.timestamp : DateTime.now();
+            return OffersCard(
+              runnerName: runnerName,
+              runnerId: offer is Offer ? offer.runnerId : null,
+              amount: amount,
+              message: message,
+              timestamp: timestamp,
+              onAccept: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Accept Offer'),
+                    content: const Text('Are you sure you want to accept this offer?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Accept'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Offer accepted!')),
+                  );
+                  // TODO: Call backend to accept the offer
+                }
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildMessagesTab() {
-    return const ChatMessages();
+    final myUserIdFuture = TokenService.getUserId();
+    return FutureBuilder<String?>(
+      future: myUserIdFuture,
+      builder: (context, snapshot) {
+        final myUserId = snapshot.data;
+        if (myUserId == null) return const Center(child: CircularProgressIndicator());
+        return StreamBuilder<QuerySnapshot>(
+          stream: ChatService().getUserChats(myUserId),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final docs = snapshot.data!.docs;
+            if (docs.isEmpty) return const Center(child: Text('No chats yet.'));
+            return ListView.builder(
+              itemCount: docs.length,
+              itemBuilder: (context, i) {
+                final data = docs[i].data() as Map<String, dynamic>;
+                final users = List<String>.from(data['users']);
+                final otherUserId = users.firstWhere((id) => id != myUserId, orElse: () => '');
+                final lastMessage = data['lastMessage'] ?? '';
+                final lastTimestamp = data['lastTimestamp'] != null
+                    ? (data['lastTimestamp'] as Timestamp).toDate()
+                    : null;
+                return ListTile(
+                  title: Text('User $otherUserId'),
+                  subtitle: Text(lastMessage),
+                  trailing: lastTimestamp != null
+                      ? Text('${lastTimestamp.hour}:${lastTimestamp.minute}')
+                      : null,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ChatPage(
+                          otherUserId: otherUserId,
+                          otherUserName: 'User $otherUserId',
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildProfileTab() {
@@ -364,6 +479,14 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+    });
+  }
+
+  void _showOffersForTask(String taskId) {
+    print('[DEBUG] _showOffersForTask called with taskId: $taskId');
+    setState(() {
+      _selectedIndex = 2; // Offers tab
+      _selectedTaskIdForOffers = taskId;
     });
   }
 
@@ -431,5 +554,108 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
         onItemTapped: _onItemTapped,
       ),
     );
+  }
+}
+
+class OffersListScreen extends StatelessWidget {
+  final String taskId;
+  const OffersListScreen({Key? key, required this.taskId}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final TaskService _taskService = TaskService();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Offers for Task')),
+      body: FutureBuilder<List<Offer>>(
+        future: _taskService.getOffersForTask(int.parse(taskId)),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: \\n${snapshot.error}'));
+          }
+          final offers = snapshot.data ?? [];
+          if (offers.isEmpty) {
+            return const Center(child: Text('No offers for this task.'));
+          }
+          return ListView.builder(
+            itemCount: offers.length,
+            itemBuilder: (context, i) {
+              final offer = offers[i];
+              final runnerName = offer is Offer ? 'Runner #${offer.runnerId}' : 'Unknown Runner';
+              final amount = offer is Offer ? offer.amount : 0.0;
+              final message = offer is Offer ? offer.message : '';
+              final timestamp = offer is Offer ? offer.timestamp : DateTime.now();
+              return OffersCard(
+                runnerName: runnerName,
+                runnerId: offer is Offer ? offer.runnerId : null,
+                amount: amount,
+                message: message,
+                timestamp: timestamp,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class ChatService {
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Returns the chat document ID for two users, creating it if needed
+  Future<String> getOrCreateChatId(String userId1, String userId2) async {
+    final users = [userId1, userId2]..sort();
+    final chatQuery = await _db
+        .collection('chat')
+        .where('users', isEqualTo: users)
+        .limit(1)
+        .get();
+
+    if (chatQuery.docs.isNotEmpty) {
+      return chatQuery.docs.first.id;
+    } else {
+      final doc = await _db.collection('chat').add({
+        'users': users,
+        'lastMessage': '',
+        'lastTimestamp': FieldValue.serverTimestamp(),
+      });
+      return doc.id;
+    }
+  }
+
+  // Stream messages for a chat
+  Stream<QuerySnapshot> getMessages(String chatId) {
+    return _db
+        .collection('chat')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots();
+  }
+
+  // Send a message
+  Future<void> sendMessage(String chatId, String senderId, String text) async {
+    await _db.collection('chat').doc(chatId).collection('messages').add({
+      'senderId': senderId,
+      'text': text,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+    // Update last message in chat doc
+    await _db.collection('chat').doc(chatId).update({
+      'lastMessage': text,
+      'lastTimestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Stream all chats for a user
+  Stream<QuerySnapshot> getUserChats(String userId) {
+    return _db
+        .collection('chat')
+        .where('users', arrayContains: userId)
+        .orderBy('lastTimestamp', descending: true)
+        .snapshots();
   }
 } 
