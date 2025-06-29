@@ -122,6 +122,9 @@ class TaskService {
     final url = Uri.parse(
         '${ApiConfig.updateTaskStatusEndpoint(taskId)}?newStatus=$newStatus&userId=$userId');
 
+    print('Updating task status - URL: $url');
+    print('Task ID: $taskId, New Status: $newStatus, User ID: $userId');
+
     try {
       final response = await http.put(
         url,
@@ -129,6 +132,8 @@ class TaskService {
           'Authorization': 'Bearer $token',
         },
       );
+
+      print('Task status update response - Status: ${response.statusCode}, Body: ${response.body}');
 
       if (response.statusCode == 200) {
         return {'success': true, 'data': response.body};
@@ -140,6 +145,7 @@ class TaskService {
         };
       }
     } catch (e) {
+      print('Task status update error: $e');
       return {
         'success': false,
         'error': 'An error occurred: ${e.toString()}',
@@ -191,6 +197,7 @@ class TaskService {
       'runnerId': runnerId,
       'amount': amount,
       'comment': message,
+      'status': 'PENDING',
     });
     try {
       final response = await http.post(
@@ -281,6 +288,133 @@ class TaskService {
         };
       }
     } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> acceptOffer({
+    required String offerId,
+    required int taskId,
+    required int taskPosterId,
+  }) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers/$offerId/accept?taskId=$taskId&taskPosterId=$taskPosterId');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error': 'Failed to accept offer. Status: ${response.statusCode}, Body: ${response.body}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteAllOffersForTask(int taskId) async {
+    final token = await TokenService.getToken();
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8082' : 'http://localhost:8082';
+    final url = Uri.parse('$baseUrl/api/offers/task/$taskId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error': 'Failed to delete offers for task. Status: ${response.statusCode}, Body: ${response.body}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: ${e.toString()}',
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> updateTaskStatusToInProgress(int taskId) async {
+    final userId = await TokenService.getUserId();
+    if (userId == null) {
+      return {'success': false, 'error': 'User not authenticated'};
+    }
+    
+    print('Updating task $taskId status to IN_PROGRESS for user $userId');
+    
+    // Try the existing method first
+    final result = await updateTaskStatus(taskId, 'IN_PROGRESS', userId);
+    print('Task status update result: $result');
+    
+    // If it fails, try alternative method with body
+    if (!result['success']) {
+      print('Trying alternative method with request body...');
+      final alternativeResult = await updateTaskStatusWithBody(taskId, 'IN_PROGRESS', userId);
+      print('Alternative task status update result: $alternativeResult');
+      return alternativeResult;
+    }
+    
+    return result;
+  }
+
+  Future<Map<String, dynamic>> updateTaskStatusWithBody(
+      int taskId, String newStatus, String userId) async {
+    final token = await TokenService.getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Not authenticated'};
+    }
+
+    final baseUrl = Platform.isAndroid ? 'http://10.0.2.2:8081' : 'http://localhost:8081';
+    final url = Uri.parse('$baseUrl/api/tasks/regular/$taskId/status');
+
+    print('Alternative task status update - URL: $url');
+    print('Task ID: $taskId, New Status: $newStatus, User ID: $userId');
+
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'status': newStatus,
+          'userId': userId,
+        }),
+      );
+
+      print('Alternative task status update response - Status: ${response.statusCode}, Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error':
+              'Failed to update status. Status: ${response.statusCode}, Body: ${response.body}',
+        };
+      }
+    } catch (e) {
+      print('Alternative task status update error: $e');
       return {
         'success': false,
         'error': 'An error occurred: ${e.toString()}',

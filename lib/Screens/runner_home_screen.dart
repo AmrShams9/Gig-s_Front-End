@@ -8,6 +8,7 @@ import '../widgets/task_card.dart';
 import '../widgets/my_tasks_card.dart';
 import '../models/task.dart';
 import 'task_detail_screen.dart';
+import 'accepted_task_detail_screen.dart';
 import 'auth.dart';
 import '../models/offer.dart';
 import '../services/token_service.dart';
@@ -32,6 +33,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   late Future<List<Task>> _tasksFuture;
   String _selectedCategory = 'All';
   Future<List<Map<String, dynamic>>>? _myOffersFuture;
+  Future<List<Map<String, dynamic>>>? _acceptedOffersFuture;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'All', 'icon': Icons.all_inclusive},
@@ -56,6 +58,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     if (runnerId == null) return;
     setState(() {
       _myOffersFuture = _fetchOffersWithTasks(runnerId);
+      _acceptedOffersFuture = _fetchAcceptedOffersWithTasks(runnerId);
     });
   }
 
@@ -68,6 +71,23 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
         result.add({'offer': offer, 'task': task});
       } catch (_) {
         result.add({'offer': offer, 'task': null});
+      }
+    }
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAcceptedOffersWithTasks(String runnerId) async {
+    final offers = await _taskService.getOffersByRunner(runnerId);
+    List<Map<String, dynamic>> result = [];
+    for (final offer in offers) {
+      // Only include accepted offers
+      if (offer.status == OfferStatus.ACCEPTED) {
+        try {
+          final task = await _taskService.getTaskById(offer.taskId ?? offer.id);
+          result.add({'offer': offer, 'task': task});
+        } catch (_) {
+          result.add({'offer': offer, 'task': null});
+        }
       }
     }
     return result;
@@ -93,6 +113,17 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (ctx) => TaskDetailScreen(task: task),
+      ),
+    );
+  }
+
+  void _handleAcceptedTaskTap(Task task, Offer offer) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => AcceptedTaskDetailScreen(
+          task: task,
+          acceptedOffer: offer,
+        ),
       ),
     );
   }
@@ -269,46 +300,80 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           },
         );
       case 2: // Assigned Tasks
-        return ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            MyTasksCard(
-              taskTitle: 'Garden Maintenance',
-              taskType: 'Gardening',
-              status: 'In Progress',
-              deadline: DateTime.now().add(const Duration(days: 2)),
-              offerAmount: 150.00,
-              taskPoster: 'John Smith',
-              taskPosterImage: 'https://via.placeholder.com/50',
-              onTap: () {
-                // Handle task tap
-              },
-            ),
-            MyTasksCard(
-              taskTitle: 'Computer Setup',
-              taskType: 'Technology',
-              status: 'Pending',
-              deadline: DateTime.now().add(const Duration(days: 5)),
-              offerAmount: 200.00,
-              taskPoster: 'Emma Wilson',
-              taskPosterImage: 'https://via.placeholder.com/50',
-              onTap: () {
-                // Handle task tap
-              },
-            ),
-            MyTasksCard(
-              taskTitle: 'Moving Help',
-              taskType: 'Moving',
-              status: 'Completed',
-              deadline: DateTime.now().subtract(const Duration(days: 1)),
-              offerAmount: 300.00,
-              taskPoster: 'Michael Brown',
-              taskPosterImage: 'https://via.placeholder.com/50',
-              onTap: () {
-                // Handle task tap
-              },
-            ),
-          ],
+        return RefreshIndicator(
+          onRefresh: () async {
+            await _loadMyOffers();
+          },
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _acceptedOffersFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              final data = snapshot.data ?? [];
+              if (data.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.assignment_turned_in,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No assigned tasks yet',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Your accepted offers will appear here',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: data.length,
+                itemBuilder: (context, index) {
+                  final offer = data[index]['offer'] as Offer;
+                  final task = data[index]['task'] as Task?;
+                  if (task == null) {
+                    return ListTile(
+                      title: Text('Task not found for offer ${offer.id}'),
+                      subtitle: Text('Offer amount: \$${offer.amount}'),
+                    );
+                  }
+                  return MyTasksCard(
+                    taskTitle: task.title,
+                    taskType: task.type,
+                    status: 'Accepted',
+                    deadline: task.startTime ?? DateTime.now().add(const Duration(days: 7)),
+                    offerAmount: offer.amount,
+                    taskPoster: 'Task Poster #${task.taskPoster}',
+                    taskPosterImage: 'https://via.placeholder.com/50',
+                    onTap: () {
+                      // Navigate to task details with offer information
+                      _handleAcceptedTaskTap(task, offer);
+                    },
+                  );
+                },
+              );
+            },
+          ),
         );
       case 3: // Stats
         return const Center(

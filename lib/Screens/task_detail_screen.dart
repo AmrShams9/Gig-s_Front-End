@@ -313,6 +313,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         message: offer.message,
                         timestamp: offer.timestamp,
                         rating: 4.5, // Placeholder
+                        offerId: offer.id,
+                        taskId: widget.task.taskId,
+                        taskPosterId: widget.task.taskPoster,
+                        status: offer.status,
                       );
                     },
                   );

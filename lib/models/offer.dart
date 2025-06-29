@@ -1,3 +1,10 @@
+enum OfferStatus {
+  PENDING,
+  AWAITING_PAYMENT,
+  CANCELLED,
+  ACCEPTED
+}
+
 class Offer {
   final String id;
   final String runnerId;
@@ -5,6 +12,7 @@ class Offer {
   final String message;
   final DateTime timestamp;
   final String? taskId;
+  final OfferStatus status;
 
   Offer({
     required this.id,
@@ -13,6 +21,7 @@ class Offer {
     required this.message,
     required this.timestamp,
     this.taskId,
+    this.status = OfferStatus.PENDING,
   });
 
   factory Offer.fromJson(Map<String, dynamic> json) {
@@ -27,6 +36,20 @@ class Offer {
       timestamp = DateTime.now();
     }
     String? taskId = json['taskId']?.toString() ?? json['task_id']?.toString();
+    
+    // Parse status from JSON
+    OfferStatus status = OfferStatus.PENDING; // Default to PENDING
+    if (json['status'] != null) {
+      try {
+        status = OfferStatus.values.firstWhere(
+          (e) => e.toString().split('.').last == json['status'].toString().toUpperCase(),
+          orElse: () => OfferStatus.PENDING,
+        );
+      } catch (_) {
+        status = OfferStatus.PENDING;
+      }
+    }
+    
     return Offer(
       id: id,
       runnerId: runnerId,
@@ -34,6 +57,19 @@ class Offer {
       message: message,
       timestamp: timestamp,
       taskId: taskId,
+      status: status,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'runnerId': runnerId,
+      'amount': amount,
+      'message': message,
+      'timestamp': timestamp.toIso8601String(),
+      'taskId': taskId,
+      'status': status.toString().split('.').last,
+    };
   }
 } 

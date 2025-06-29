@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../Screens/Chat_messages.dart';
 import '../Screens/chat_page.dart';
 import '../services/token_service.dart';
+import '../services/task_service.dart';
+import '../models/offer.dart';
 
+// OffersCard widget for displaying offer information
 class OffersCard extends StatelessWidget {
   final String profileImage;
   final String runnerName;
@@ -12,6 +15,10 @@ class OffersCard extends StatelessWidget {
   final DateTime timestamp;
   final double rating;
   final VoidCallback? onAccept;
+  final String? offerId;
+  final String? taskId;
+  final int? taskPosterId;
+  final OfferStatus? status;
 
   const OffersCard({
     Key? key,
@@ -23,7 +30,43 @@ class OffersCard extends StatelessWidget {
     required this.timestamp,
     this.rating = 4.5,
     this.onAccept,
+    this.offerId,
+    this.taskId,
+    this.taskPosterId,
+    this.status,
   }) : super(key: key);
+
+  bool get _canAcceptOffer {
+    return status == null || status == OfferStatus.PENDING;
+  }
+
+  Color _getStatusColor() {
+    switch (status) {
+      case OfferStatus.ACCEPTED:
+        return Colors.green;
+      case OfferStatus.CANCELLED:
+        return Colors.red;
+      case OfferStatus.AWAITING_PAYMENT:
+        return Colors.orange;
+      case OfferStatus.PENDING:
+      default:
+        return Colors.blue;
+    }
+  }
+
+  String _getStatusText() {
+    switch (status) {
+      case OfferStatus.ACCEPTED:
+        return 'Accepted';
+      case OfferStatus.CANCELLED:
+        return 'Cancelled';
+      case OfferStatus.AWAITING_PAYMENT:
+        return 'Awaiting Payment';
+      case OfferStatus.PENDING:
+      default:
+        return 'Pending';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +89,34 @@ class OffersCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        runnerName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              runnerName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor().withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _getStatusColor(), width: 1),
+                            ),
+                            child: Text(
+                              _getStatusText(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: _getStatusColor(),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       Row(
                         children: [
@@ -113,17 +178,95 @@ class OffersCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     ElevatedButton.icon(
-                      icon: const Icon(Icons.check_circle, size: 18, color: Colors.white),
-                      label: const Text('Accept Offer'),
+                      icon: Icon(
+                        _canAcceptOffer ? Icons.check_circle : Icons.info,
+                        size: 18,
+                        color: Colors.white
+                      ),
+                      label: Text(_canAcceptOffer ? 'Accept Offer' : _getStatusText()),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF1DBF73),
+                        backgroundColor: _canAcceptOffer ? Color(0xFF1DBF73) : _getStatusColor(),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: onAccept,
+                      onPressed: _canAcceptOffer ? (onAccept ?? (offerId != null && taskId != null && taskPosterId != null
+                          ? () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Accept Offer'),
+                                  content: const Text('Are you sure you want to accept this offer?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(true),
+                                      child: const Text('Accept'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirmed == true) {
+                                final taskService = TaskService();
+                                
+                                // First, accept the offer
+                                final acceptResult = await taskService.acceptOffer(
+                                  offerId: offerId!,
+                                  taskId: int.parse(taskId!),
+                                  taskPosterId: taskPosterId!,
+                                );
+                                
+                                if (acceptResult['success']) {
+                                  // Then update task status to IN_PROGRESS
+                                  final statusResult = await taskService.updateTaskStatusToInProgress(
+                                    int.parse(taskId!),
+                                  );
+                                  
+                                  if (statusResult['success']) {
+                                    // Finally, delete all other offers for this task
+                                    final deleteResult = await taskService.deleteAllOffersForTask(
+                                      int.parse(taskId!),
+                                    );
+                                    
+                                    if (deleteResult['success']) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Offer accepted successfully! Task status updated to IN_PROGRESS.'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Offer accepted but failed to clean up other offers: ${deleteResult['error']}'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Offer accepted but failed to update task status: ${statusResult['error']}'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to accept offer: ${acceptResult['error']}'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            }
+                          : null)) : null,
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(

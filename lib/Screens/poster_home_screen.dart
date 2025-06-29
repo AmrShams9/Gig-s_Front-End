@@ -345,7 +345,19 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
               amount: amount,
               message: message,
               timestamp: timestamp,
+              offerId: offer is Offer ? offer.id : null,
+              taskId: _selectedTaskIdForOffers,
+              taskPosterId: null,
+              status: offer is Offer ? offer.status : null,
               onAccept: () async {
+                final taskPosterId = int.tryParse(await TokenService.getUserId() ?? '');
+                if (taskPosterId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('User not authenticated')),
+                  );
+                  return;
+                }
+                
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -364,10 +376,58 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                   ),
                 );
                 if (confirmed == true) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Offer accepted!')),
+                  final taskService = TaskService();
+                  
+                  // First, accept the offer
+                  final acceptResult = await taskService.acceptOffer(
+                    offerId: offer is Offer ? offer.id : '',
+                    taskId: int.parse(_selectedTaskIdForOffers!),
+                    taskPosterId: taskPosterId,
                   );
-                  // TODO: Call backend to accept the offer
+                  
+                  if (acceptResult['success']) {
+                    // Then update task status to IN_PROGRESS
+                    final statusResult = await taskService.updateTaskStatusToInProgress(
+                      int.parse(_selectedTaskIdForOffers!),
+                    );
+                    
+                    if (statusResult['success']) {
+                      // Finally, delete all other offers for this task
+                      final deleteResult = await taskService.deleteAllOffersForTask(
+                        int.parse(_selectedTaskIdForOffers!),
+                      );
+                      
+                      if (deleteResult['success']) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Offer accepted successfully! Task status updated to IN_PROGRESS.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Offer accepted but failed to clean up other offers: ${deleteResult['error']}'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Offer accepted but failed to update task status: ${statusResult['error']}'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to accept offer: ${acceptResult['error']}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               },
             );
@@ -593,6 +653,91 @@ class OffersListScreen extends StatelessWidget {
                 amount: amount,
                 message: message,
                 timestamp: timestamp,
+                offerId: offer is Offer ? offer.id : null,
+                taskId: taskId,
+                taskPosterId: null,
+                status: offer is Offer ? offer.status : null,
+                onAccept: () async {
+                  final taskPosterId = int.tryParse(await TokenService.getUserId() ?? '');
+                  if (taskPosterId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('User not authenticated')),
+                    );
+                    return;
+                  }
+                  
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Accept Offer'),
+                      content: const Text('Are you sure you want to accept this offer?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('Accept'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    final taskService = TaskService();
+                    
+                    // First, accept the offer
+                    final acceptResult = await taskService.acceptOffer(
+                      offerId: offer is Offer ? offer.id : '',
+                      taskId: int.parse(taskId),
+                      taskPosterId: taskPosterId,
+                    );
+                    
+                    if (acceptResult['success']) {
+                      // Then update task status to IN_PROGRESS
+                      final statusResult = await taskService.updateTaskStatusToInProgress(
+                        int.parse(taskId),
+                      );
+                      
+                      if (statusResult['success']) {
+                        // Finally, delete all other offers for this task
+                        final deleteResult = await taskService.deleteAllOffersForTask(
+                          int.parse(taskId),
+                        );
+                        
+                        if (deleteResult['success']) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Offer accepted successfully! Task status updated to IN_PROGRESS.'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Offer accepted but failed to clean up other offers: ${deleteResult['error']}'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Offer accepted but failed to update task status: ${statusResult['error']}'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to accept offer: ${acceptResult['error']}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
               );
             },
           );
