@@ -271,7 +271,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               const SizedBox(height: 6),
                               Text('Budget', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
                               const SizedBox(height: 2),
-                              Text(' 24${widget.task.amount.toStringAsFixed(2)}', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                              Text(' 24 ${(widget.task.amount ?? 0).toStringAsFixed(2)}', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                             ],
                           ),
                           Column(

@@ -20,6 +20,7 @@ import '../Screens/chat_page.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'auth.dart';
 import 'runner_home_screen.dart';
+import '../models/event_task.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
@@ -38,7 +39,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
   final UserService _userService = UserService();
-  late Future<List<Task>> _tasksFuture;
+  late Future<List<Map<String, dynamic>>> _tasksFuture;
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Moving', 'icon': Icons.local_shipping},
     {'name': 'Cleaning', 'icon': Icons.cleaning_services},
@@ -71,10 +72,10 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     }
   }
 
-  Future<List<Task>> _loadTasks() async {
+  Future<List<Map<String, dynamic>>> _loadTasks() async {
     final userId = await TokenService.getUserId();
     if (userId == null) throw Exception('User not authenticated');
-    return _taskService.getTasksByPoster(userId);
+    return _taskService.getTasksByPosterRaw(userId);
   }
 
   Future<int> _getOffersCount(String taskId) async {
@@ -181,7 +182,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        task.type.isNotEmpty ? task.type : 'Other',
+                        task.type?.isNotEmpty == true ? task.type : 'Other',
                         style: TextStyle(
                           color: Colors.blue.shade700,
                           fontSize: 12,
@@ -201,7 +202,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
                         const SizedBox(height: 8),
                         Text('$offersCount offers received', style: TextStyle(color: Colors.green.shade700, fontSize: 13)),
                         const SizedBox(height: 4),
-                        Text(task.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey.shade700)),
+                        Text(task.description?.isNotEmpty == true ? task.description : '', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey.shade700)),
                       ],
                     ),
                     onTap: () {
@@ -285,7 +286,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    return FutureBuilder<List<Task>>(
+    return FutureBuilder<List<Map<String, dynamic>>>(
       future: _tasksFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -371,14 +372,22 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
               },
             ),
             const SizedBox(height: 8),
-            _buildSummaryCards(tasks),
+            _buildSummaryCards(tasks.map((t) => Task.fromJson(t)).toList()),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('My Tasks', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
             ),
             const SizedBox(height: 8),
-            ...tasks.map(_buildTaskCard).toList(),
+            ...tasks.map((taskJson) {
+              if (taskJson['type'] == 'EVENT_STAFFING') {
+                final eventTask = EventTask.fromJson(taskJson);
+                return EventTaskCard(eventTask: eventTask);
+              } else {
+                final task = Task.fromJson(taskJson);
+                return _buildTaskCard(task);
+              }
+            }).toList(),
           ],
         );
       },
@@ -749,64 +758,6 @@ class OffersListScreen extends StatelessWidget {
   }
 }
 
-class ChatService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  // Returns the chat document ID for two users, creating it if needed
-  Future<String> getOrCreateChatId(String userId1, String userId2) async {
-    final users = [userId1, userId2]..sort();
-    final chatQuery = await _db
-        .collection('chat')
-        .where('users', isEqualTo: users)
-        .limit(1)
-        .get();
-
-    if (chatQuery.docs.isNotEmpty) {
-      return chatQuery.docs.first.id;
-    } else {
-      final doc = await _db.collection('chat').add({
-        'users': users,
-        'lastMessage': '',
-        'lastTimestamp': FieldValue.serverTimestamp(),
-      });
-      return doc.id;
-    }
-  }
-
-  // Stream messages for a chat
-  Stream<QuerySnapshot> getMessages(String chatId) {
-    return _db
-        .collection('chat')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots();
-  }
-
-  // Send a message
-  Future<void> sendMessage(String chatId, String senderId, String text) async {
-    await _db.collection('chat').doc(chatId).collection('messages').add({
-      'senderId': senderId,
-      'text': text,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-    // Update last message in chat doc
-    await _db.collection('chat').doc(chatId).update({
-      'lastMessage': text,
-      'lastTimestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
-  // Stream all chats for a user
-  Stream<QuerySnapshot> getUserChats(String userId) {
-    return _db
-        .collection('chat')
-        .where('users', arrayContains: userId)
-        .orderBy('lastTimestamp', descending: true)
-        .snapshots();
-  }
-}
-
 class _PosterChatTabWithSearchAndSettings extends StatefulWidget {
   final String myUserId;
   const _PosterChatTabWithSearchAndSettings({required this.myUserId});
@@ -935,6 +886,111 @@ class _PosterChatTabWithSearchAndSettingsState extends State<_PosterChatTabWithS
           ),
         ),
       ],
+    );
+  }
+}
+
+class EventTaskCard extends StatelessWidget {
+  final EventTask eventTask;
+  const EventTaskCard({Key? key, required this.eventTask}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Posted: \\${eventTask.createdDate?.toString() ?? ''}',
+              style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.6)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              eventTask.title,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      eventTask.type?.isNotEmpty == true ? eventTask.type : '',
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.attach_money, size: 16, color: theme.colorScheme.primary),
+                      Text(
+                        eventTask.fixedPay.toStringAsFixed(0),
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text('People: \\${eventTask.requiredPeople}', style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.7)), overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              eventTask.description?.isNotEmpty == true ? eventTask.description : '',
+              style: TextStyle(fontSize: 15, color: theme.colorScheme.primary.withOpacity(0.85)),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: theme.colorScheme.primary.withOpacity(0.7)),
+                const SizedBox(width: 4),
+                Text(eventTask.location?.isNotEmpty == true ? eventTask.location : '', style: TextStyle(color: theme.colorScheme.primary.withOpacity(0.7), fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: theme.colorScheme.primary.withOpacity(0.7)),
+                const SizedBox(width: 4),
+                Text('From: \\${eventTask.startDate?.toString() ?? ''} To: \\${eventTask.endDate?.toString() ?? ''}', style: TextStyle(color: theme.colorScheme.primary.withOpacity(0.7), fontSize: 14)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 } 

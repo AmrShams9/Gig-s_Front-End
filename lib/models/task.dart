@@ -14,13 +14,20 @@ class Task {
   final double? latitude;
   final Map<String, dynamic>? additionalRequirements;
   final Map<String, dynamic>? additionalAttributes;
-  final double amount;
+  final double? amount;
   final List<Question>? questions;
   final List<Offer>? offers;
   final double? price;
   final String? duration;
   final DateTime? startTime;
   final DateTime? endTime;
+  final double? fixedPay;
+  final int? requiredPeople;
+  final String? location;
+  final String? startDate;
+  final String? endDate;
+  final int? numberOfDays;
+  final List<dynamic>? runnerIds;
 
   Task({
     this.taskId,
@@ -34,16 +41,29 @@ class Task {
     this.latitude,
     this.additionalRequirements,
     this.additionalAttributes,
-    required this.amount,
+    this.amount,
     this.questions,
     this.offers,
     this.price,
     this.duration,
     this.startTime,
     this.endTime,
+    this.fixedPay,
+    this.requiredPeople,
+    this.location,
+    this.startDate,
+    this.endDate,
+    this.numberOfDays,
+    this.runnerIds,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
+    print('Parsing fixedPay: \\${json['fixedPay']}');
+    print('Parsing amount: \\${json['amount']}');
+    print('Parsing requiredPeople: \\${json['requiredPeople']}');
+    print('Parsing numberOfDays: \\${json['numberOfDays']}');
+    print('Parsing longitude: \\${json['longitude']}');
+    print('Parsing latitude: \\${json['latitude']}');
     return Task(
       taskId: json['taskId']?.toString(),
       taskPoster: json['taskPoster'] as int,
@@ -52,12 +72,18 @@ class Task {
       type: json['type'] as String,
       taskType: json['task_type'] as String? ?? 'REGULAR',
       status: json['status'] as String?,
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
       additionalRequirements: json['additionalRequirements'] as Map<String, dynamic>?,
       additionalAttributes: json['additionalAttributes'] as Map<String, dynamic>?,
-      amount: (json['amount'] as num).toDouble(),
-      // 'questions' and 'offers' are not in the provided JSON, so they can be null
+      amount: json['amount'] != null ? (json['amount'] as num).toDouble() : null,
+      fixedPay: json['fixedPay'] != null ? (json['fixedPay'] as num).toDouble() : null,
+      requiredPeople: json['requiredPeople'] != null ? json['requiredPeople'] as int : null,
+      location: json['location'] as String?,
+      startDate: json['startDate'] as String?,
+      endDate: json['endDate'] as String?,
+      numberOfDays: json['numberOfDays'] != null ? json['numberOfDays'] as int : null,
+      runnerIds: json['runnerIds'] != null ? List<dynamic>.from(json['runnerIds']) : [],
     );
   }
 
@@ -75,6 +101,13 @@ class Task {
       'additionalRequirements': additionalRequirements,
       'additionalAttributes': additionalAttributes,
       'amount': amount,
+      'fixedPay': fixedPay,
+      'requiredPeople': requiredPeople,
+      'location': location,
+      'startDate': startDate,
+      'endDate': endDate,
+      'numberOfDays': numberOfDays,
+      'runnerIds': runnerIds,
     };
   }
 } 

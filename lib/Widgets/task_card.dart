@@ -70,7 +70,7 @@ class TaskCard extends StatelessWidget {
                       children: [
                         Icon(Icons.attach_money, size: 16, color: theme.colorScheme.primary),
                         Text(
-                          task.amount.toStringAsFixed(0),
+                          (task.amount ?? 0).toStringAsFixed(0),
                           style: TextStyle(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
@@ -95,6 +95,18 @@ class TaskCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 softWrap: true,
               ),
+              const SizedBox(height: 10),
+              // Event Staffing Fields
+              if (task.type == 'EVENT_STAFFING' && task.fixedPay != null)
+                Text('Fixed Pay: \$${task.fixedPay}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.type == 'EVENT_STAFFING' && task.requiredPeople != null)
+                Text('Required People: \${task.requiredPeople}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.type == 'EVENT_STAFFING' && task.location != null)
+                Text('Location: \${task.location}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.type == 'EVENT_STAFFING' && task.startDate != null && task.endDate != null)
+                Text('From: \${task.startDate} To: \${task.endDate}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.type == 'EVENT_STAFFING' && task.numberOfDays != null)
+                Text('Number of Days: \${task.numberOfDays}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
               const SizedBox(height: 10),
               // Tags (example tags, replace with real tags if available)
               SingleChildScrollView(

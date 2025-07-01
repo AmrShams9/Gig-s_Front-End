@@ -5,6 +5,7 @@ import '../config/api_config.dart';
 import 'token_service.dart';
 import 'dart:io';
 import '../models/offer.dart';
+import '../models/event_task.dart';
 
 class TaskService {
   List<Task> getDummyTasks() {
@@ -441,6 +442,60 @@ class TaskService {
       }
     } catch (e) {
       throw Exception('An error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> postEventTask(EventTask eventTask) async {
+    final token = await TokenService.getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Not authenticated'};
+    }
+
+    final url = Uri.parse(ApiConfig.postTaskEndpoint);
+
+    print('Posting event task with posterId: \\${eventTask.taskPoster}');
+    print('EventTask payload: \\${jsonEncode(eventTask.toJson())}');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(eventTask.toJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (response.body.isNotEmpty && response.body.trim().startsWith('{')) {
+          return {'success': true, 'data': jsonDecode(response.body)};
+        }
+        return {'success': true, 'data': response.body};
+      } else {
+        return {
+          'success': false,
+          'error':
+              'Failed to post event task. Status: \\${response.statusCode}, Body: \\${response.body}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'An error occurred: \\${e.toString()}',
+      };
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getTasksByPosterRaw(String posterId) async {
+    final token = await TokenService.getToken();
+    if (token == null) throw Exception('Not authenticated');
+    final url = Uri.parse(ApiConfig.getTasksByPosterEndpoint(posterId));
+    final response = await http.get(url, headers: {'Authorization': 'Bearer $token'});
+    if (response.statusCode == 200) {
+      final List<dynamic> taskData = jsonDecode(response.body);
+      return List<Map<String, dynamic>>.from(taskData);
+    } else {
+      throw Exception('Failed to load tasks. Status: [31m${response.statusCode}, Body: ${response.body}');
     }
   }
 }

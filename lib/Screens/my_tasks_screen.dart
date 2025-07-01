@@ -355,7 +355,7 @@ class _MyTaskCardState extends State<MyTaskCard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${task.amount.toStringAsFixed(2)}',
+                    ' ${(task.amount ?? 0).toStringAsFixed(2)}',
                     style: const TextStyle(
                       color: Color(0xFF1DBF73),
                       fontSize: 12,

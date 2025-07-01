@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
 import 'task_form_screen.dart';
+import 'post_delivery_screen.dart';
+import 'post_moving_task.dart';
+import 'post_event_staffing_task.dart';
 
 class PostTaskScreen extends StatelessWidget {
   const PostTaskScreen({super.key});
@@ -60,11 +63,31 @@ class PostTaskScreen extends StatelessWidget {
       BuildContext context, IconData icon, String label) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => TaskFormScreen(category: label),
-          ),
-        );
+        if (label == 'Delivery') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PostDeliveryScreen(),
+            ),
+          );
+        } else if (label == 'Moving') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PostMovingTaskScreen(),
+            ),
+          );
+        } else if (label == 'Event Staffing') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PostEventStaffingTaskScreen(),
+            ),
+          );
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => TaskFormScreen(category: label),
+            ),
+          );
+        }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
