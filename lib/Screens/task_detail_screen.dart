@@ -30,37 +30,67 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     bool isLoading = false;
     String? errorMessage;
     String? successMessage;
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Make an Offer'),
-              content: Column(
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Text('Make an Offer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 18),
                   TextField(
                     controller: _amountController,
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Offer Amount',
-                      prefixIcon: Icon(Icons.attach_money),
+                      prefixIcon: Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   TextField(
                     controller: _messageController,
                     maxLines: 2,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Message',
-                      prefixIcon: Icon(Icons.message),
+                      prefixIcon: Icon(Icons.message, color: Theme.of(context).colorScheme.primary),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
                     ),
                   ),
                   if (isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: 16),
-                      child: CircularProgressIndicator(),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
                   if (errorMessage != null)
                     Padding(
@@ -72,71 +102,90 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(successMessage!, style: const TextStyle(color: Colors.green)),
                     ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(context).colorScheme.primary,
+                            side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isLoading
+                              ? null
+                              : () async {
+                                  final amount = double.tryParse(_amountController.text);
+                                  final message = _messageController.text.trim();
+                                  if (amount == null || amount <= 0) {
+                                    setState(() => errorMessage = 'Enter a valid amount.');
+                                    return;
+                                  }
+                                  if (message.isEmpty) {
+                                    setState(() => errorMessage = 'Enter a message.');
+                                    return;
+                                  }
+                                  setState(() {
+                                    isLoading = true;
+                                    errorMessage = null;
+                                    successMessage = null;
+                                  });
+                                  final runnerIdStr = await TokenService.getUserId();
+                                  if (runnerIdStr == null) {
+                                    setState(() {
+                                      isLoading = false;
+                                      errorMessage = 'User not authenticated.';
+                                    });
+                                    return;
+                                  }
+                                  final runnerId = int.tryParse(runnerIdStr);
+                                  if (runnerId == null) {
+                                    setState(() {
+                                      isLoading = false;
+                                      errorMessage = 'Invalid user ID.';
+                                    });
+                                    return;
+                                  }
+                                  final result = await _taskService.postOffer(
+                                    taskId: int.parse(widget.task.taskId!),
+                                    runnerId: runnerId,
+                                    amount: amount,
+                                    message: message,
+                                  );
+                                  if (result['success']) {
+                                    setState(() {
+                                      isLoading = false;
+                                      successMessage = 'Offer sent successfully!';
+                                    });
+                                    await Future.delayed(const Duration(seconds: 1));
+                                    if (context.mounted) Navigator.of(context).pop();
+                                  } else {
+                                    setState(() {
+                                      isLoading = false;
+                                      errorMessage = result['error'] ?? 'Failed to send offer.';
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Send Offer'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () async {
-                          final amount = double.tryParse(_amountController.text);
-                          final message = _messageController.text.trim();
-                          if (amount == null || amount <= 0) {
-                            setState(() => errorMessage = 'Enter a valid amount.');
-                            return;
-                          }
-                          if (message.isEmpty) {
-                            setState(() => errorMessage = 'Enter a message.');
-                            return;
-                          }
-                          setState(() {
-                            isLoading = true;
-                            errorMessage = null;
-                            successMessage = null;
-                          });
-                          final runnerIdStr = await TokenService.getUserId();
-                          if (runnerIdStr == null) {
-                            setState(() {
-                              isLoading = false;
-                              errorMessage = 'User not authenticated.';
-                            });
-                            return;
-                          }
-                          final runnerId = int.tryParse(runnerIdStr);
-                          if (runnerId == null) {
-                            setState(() {
-                              isLoading = false;
-                              errorMessage = 'Invalid user ID.';
-                            });
-                            return;
-                          }
-                          final result = await _taskService.postOffer(
-                            taskId: int.parse(widget.task.taskId!),
-                            runnerId: runnerId,
-                            amount: amount,
-                            message: message,
-                          );
-                          if (result['success']) {
-                            setState(() {
-                              isLoading = false;
-                              successMessage = 'Offer sent successfully!';
-                            });
-                            await Future.delayed(const Duration(seconds: 1));
-                            if (context.mounted) Navigator.of(context).pop();
-                          } else {
-                            setState(() {
-                              isLoading = false;
-                              errorMessage = result['error'] ?? 'Failed to send offer.';
-                            });
-                          }
-                        },
-                  child: const Text('Send Offer'),
-                ),
-              ],
             );
           },
         );
@@ -177,14 +226,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               },
             ),
           ],
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            tabs: const [
               Tab(text: 'Info'),
               Tab(text: 'Questions'),
               Tab(text: 'Offers'),
             ],
-            indicatorColor: Color(0xFF1DBF73),
-            labelColor: Color(0xFF1DBF73),
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            labelColor: Theme.of(context).colorScheme.primary,
             unselectedLabelColor: Colors.grey,
           ),
         ),
@@ -196,64 +245,125 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Title
                   Text(
                     widget.task.title,
-                    style: const TextStyle(
-                        fontSize: 24, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Posted by',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  Text(
-                    widget.task.taskPoster.toString(),
-                    style: const TextStyle(
-                        fontSize: 16, color: Color(0xFF1DBF73)),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Description',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.task.description,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Additional Requirements',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Location Details: ${widget.task.additionalRequirements?['location'] ?? 'Not specified'}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Location: Lat: ${widget.task.latitude}, Lon: ${widget.task.longitude}',
-                          style: const TextStyle(fontSize: 16),
-                        ),
+                  const SizedBox(height: 10),
+                  // Budget, Duration, Level, Location
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    color: Theme.of(context).colorScheme.secondary,
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Column(
+                            children: [
+                              Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(height: 6),
+                              Text('Budget', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                              const SizedBox(height: 2),
+                              Text(' 24${widget.task.amount.toStringAsFixed(2)}', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Icon(Icons.location_on, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(height: 6),
+                              Text('Location', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.task.additionalRequirements?['location'] ?? 'Not specified',
+                                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(height: 6),
+                              Text('Duration', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.task.duration ?? 'N/A',
+                                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(height: 6),
+                              Text('Type', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.task.type,
+                                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.category, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Type: ${widget.task.type}',
-                        style: const TextStyle(fontSize: 16),
+                  const SizedBox(height: 18),
+                  // Requirements (dynamic)
+                  Text('Requirements:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 6),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.7),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.task.description, style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.primary)),
+                          if (widget.task.additionalRequirements != null && widget.task.additionalRequirements!.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            ...widget.task.additionalRequirements!.entries.map((entry) {
+                              if (entry.key == 'location') return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text('- ${entry.value}', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+                              );
+                            }).toList(),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  // Safety Rules (static)
+                  Text('Safety Rules:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.primary)),
+                  const SizedBox(height: 6),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.7),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('• Never share sensitive information or passwords.', style: TextStyle(fontSize: 14)),
+                          SizedBox(height: 4),
+                          Text('• Meet in safe, public places if required.', style: TextStyle(fontSize: 14)),
+                          SizedBox(height: 4),
+                          Text('• Report any suspicious activity to support.', style: TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -325,6 +435,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
           ],
         ),
+        backgroundColor: Theme.of(context).colorScheme.background,
         bottomNavigationBar: Padding(
           padding: const EdgeInsets.all(16.0),
           child: ElevatedButton(
@@ -332,8 +443,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               _showMakeOfferDialog();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1DBF73),
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size(double.infinity, 50), // full width
             ),
             child: const Text('Make an Offer', style: TextStyle(fontSize: 18)),

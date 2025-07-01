@@ -8,7 +8,8 @@ import '../services/token_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:jwt_decoder/jwt_decoder.dart';
-//firbasefirstore.instance.collection('users').doc(user id).set(username email imageurl,
+import '../Widgets/user_image_picker.dart';
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -18,7 +19,7 @@ class AuthScreen extends StatefulWidget {
   }
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   final _authService = AuthService();
   final _form = GlobalKey<FormState>();
   var _isLogin = true;
@@ -35,6 +36,31 @@ class _AuthScreenState extends State<AuthScreen> {
   var _isLoading = false;
   String? _tempPassword; // Add this line to store password temporarily
   String? _authToken; // Store the authentication token
+  int _signupStep = 0;
+  final _signupSteps = 3;
+  File? _signupImage;
+  late AnimationController _logoController;
+  late Animation<double> _logoAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _logoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _logoAnimation = CurvedAnimation(
+      parent: _logoController,
+      curve: Curves.elasticOut,
+    );
+    _logoController.forward();
+  }
+
+  @override
+  void dispose() {
+    _logoController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -100,6 +126,325 @@ class _AuthScreenState extends State<AuthScreen> {
         _selectedRoles.add(role);
       }
     });
+  }
+
+  void _nextSignupStep() {
+    if (_signupStep < _signupSteps - 1) {
+      setState(() => _signupStep++);
+    }
+  }
+  void _prevSignupStep() {
+    if (_signupStep > 0) {
+      setState(() => _signupStep--);
+    }
+  }
+
+  Widget _buildLogo() {
+    return ScaleTransition(
+      scale: _logoAnimation,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 40, bottom: 16),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              child: Icon(Icons.flash_on, color: Theme.of(context).colorScheme.primary, size: 40),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Gigs',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF11366A),
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoginCard() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      child: Card(
+        key: const ValueKey('login'),
+        margin: const EdgeInsets.all(20),
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  key: const ValueKey('username'),
+                  autocorrect: false,
+                  textCapitalization: TextCapitalization.none,
+                  decoration: InputDecoration(labelText: 'Username', fillColor: Theme.of(context).colorScheme.secondary),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your username.' : null,
+                  onSaved: (value) => _enteredUsername = value!.trim(),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('password'),
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: 'Password', fillColor: Theme.of(context).colorScheme.secondary),
+                  validator: (value) {
+                    _tempPassword = value;
+                    if (value == null || value.trim().length < 6) {
+                      return 'Password must be at least 6 characters long.';
+                    }
+                    return null;
+                  },
+                  onSaved: (value) => _enteredPassword = value!.trim(),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildRoleSelector('runner', Icons.directions_run, 'Runner'),
+                    const SizedBox(width: 20),
+                    _buildRoleSelector('task_poster', Icons.assignment, 'Task Poster'),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Login', style: TextStyle(fontSize: 18)),
+                      ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLogin = false;
+                      _signupStep = 0;
+                    });
+                  },
+                  child: Text('Create an account', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleSelector(String role, IconData icon, String label) {
+    final selected = _selectedRoles.contains(role);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 18),
+      decoration: BoxDecoration(
+        color: selected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.secondary,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: selected
+            ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.2), blurRadius: 8, offset: Offset(0, 4))]
+            : [],
+      ),
+      child: InkWell(
+        onTap: () => _toggleRole(role),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.primary),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.primary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignupStepper() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      child: Card(
+        key: ValueKey(_signupStep),
+        margin: const EdgeInsets.all(20),
+        elevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stepper(
+                  type: StepperType.vertical,
+                  currentStep: _signupStep,
+                  onStepContinue: _signupStep < _signupSteps - 1 ? _nextSignupStep : _submit,
+                  onStepCancel: _signupStep > 0 ? _prevSignupStep : null,
+                  controlsBuilder: (context, details) {
+                    return Row(
+                      children: <Widget>[
+                        if (_signupStep < _signupSteps - 1)
+                          ElevatedButton(
+                            onPressed: details.onStepContinue,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Next'),
+                          ),
+                        if (_signupStep == _signupSteps - 1)
+                          ElevatedButton(
+                            onPressed: _submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Signup'),
+                          ),
+                        if (_signupStep > 0)
+                          TextButton(
+                            onPressed: details.onStepCancel,
+                            child: const Text('Back'),
+                          ),
+                      ],
+                    );
+                  },
+                  steps: [
+                    Step(
+                      title: const Text('Profile Image'),
+                      isActive: _signupStep >= 0,
+                      state: _signupStep > 0 ? StepState.complete : StepState.indexed,
+                      content: UserImagePicker(
+                        onPickImage: (img) => setState(() => _signupImage = img),
+                      ),
+                    ),
+                    Step(
+                      title: const Text('Personal Info'),
+                      isActive: _signupStep >= 1,
+                      state: _signupStep > 1 ? StepState.complete : StepState.indexed,
+                      content: Column(
+                        children: [
+                          TextFormField(
+                            key: const ValueKey('firstname'),
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(labelText: 'First Name', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your first name.' : null,
+                            onSaved: (value) => _enteredFirstName = value!,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('lastname'),
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: InputDecoration(labelText: 'Last Name', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your last name.' : null,
+                            onSaved: (value) => _enteredLastName = value!,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('phonenumber'),
+                            keyboardType: TextInputType.phone,
+                            decoration: InputDecoration(labelText: 'Phone Number', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your phone number.' : null,
+                            onSaved: (value) => _enteredPhoneNumber = value!,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('governmentid'),
+                            keyboardType: TextInputType.text,
+                            decoration: InputDecoration(labelText: 'Government ID', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your government ID.' : null,
+                            onSaved: (value) => _enteredGovernmentId = value!,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Step(
+                      title: const Text('Account Info'),
+                      isActive: _signupStep >= 2,
+                      state: StepState.indexed,
+                      content: Column(
+                        children: [
+                          TextFormField(
+                            key: const ValueKey('email_signup'),
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.none,
+                            decoration: InputDecoration(labelText: 'Email Address', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || !value.contains('@') ? 'Please enter a valid email address.' : null,
+                            onSaved: (value) => _enteredEmail = value!,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('username_signup'),
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.none,
+                            decoration: InputDecoration(labelText: 'Username', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) => value == null || value.trim().isEmpty ? 'Please enter your username.' : null,
+                            onSaved: (value) => _enteredUsername = value!.trim(),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('password_signup'),
+                            obscureText: true,
+                            decoration: InputDecoration(labelText: 'Password', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) {
+                              _tempPassword = value;
+                              if (value == null || value.trim().length < 6) {
+                                return 'Password must be at least 6 characters long.';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _enteredPassword = value!.trim(),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            key: const ValueKey('confirmpassword_signup'),
+                            obscureText: true,
+                            decoration: InputDecoration(labelText: 'Confirm Password', fillColor: Theme.of(context).colorScheme.secondary),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please confirm your password.';
+                              }
+                              if (value != _tempPassword) {
+                                return 'Passwords do not match.';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _enteredConfirmPassword = value!,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLogin = true;
+                      _signupStep = 0;
+                    });
+                  },
+                  child: Text('I already have an account', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _submit() async {
@@ -170,7 +515,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   content: Text('Login successful, but User ID could not be determined.'),
                   backgroundColor: Colors.red,
                 ),
-        );
+              );
             }
             return;
           }
@@ -270,413 +615,24 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  void _showRoleSelectionDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Select Your Role'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Please select how you want to use the app:'),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.background,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                InkWell(
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    if (mounted) {
-                      Navigator.of(context).pushReplacementNamed('/runner-home');
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.directions_run, color: Colors.blue.shade700),
-                        const SizedBox(height: 8),
-                        const Text('Runner'),
-                      ],
-                    ),
-                  ),
-                ),
-                InkWell(
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    if (mounted) {
-                      Navigator.of(context).pushReplacementNamed('/poster-home');
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.assignment, color: Colors.green.shade700),
-                        const SizedBox(height: 8),
-                        const Text('Task Poster'),
-                      ],
-                    ),
-                  ),
+                _buildLogo(),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  child: _isLogin ? _buildLoginCard() : _buildSignupStepper(),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(
-                  top: 30,
-                  bottom: 20,
-                  left: 20,
-                  right: 20,
-                ),
-                child: const Text(
-                  'Gigs',
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1DBF73),
-                  ),
-                ),
-              ),
-              Card(
-                margin: const EdgeInsets.all(20),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Form(
-                      key: _form,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!_isLogin) ...[
-                            Center(
-                              child: Stack(
-                                children: [
-                                  GestureDetector(
-                                    onTap: _showImagePickerDialog,
-                                    child: Container(
-                                      width: 120,
-                                      height: 120,
-                                      margin: const EdgeInsets.only(bottom: 20),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                        image: _selectedImage != null
-                                            ? DecorationImage(
-                                                image: FileImage(_selectedImage!),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : null,
-                                      ),
-                                      child: _selectedImage == null
-                                          ? Icon(
-                                              Icons.camera_alt,
-                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                              size: 50,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                  if (_selectedImage != null)
-                                    Positioned(
-                                      bottom: 10,
-                                      right: 10,
-                                      child: InkWell(
-                                        onTap: _showImagePickerDialog,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.secondaryContainer,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          padding: const EdgeInsets.all(8),
-                                          child: Icon(
-                                            Icons.edit,
-                                            color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            TextFormField(
-                              key: const ValueKey('firstname'),
-                              autocorrect: false,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'First Name',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your first name.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredFirstName = value!;
-                              },
-                            ),
-                            TextFormField(
-                              key: const ValueKey('lastname'),
-                              autocorrect: false,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Last Name',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your last name.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredLastName = value!;
-                              },
-                            ),
-                            TextFormField(
-                              key: const ValueKey('email_signup'),
-                              keyboardType: TextInputType.emailAddress,
-                              autocorrect: false,
-                              textCapitalization: TextCapitalization.none,
-                              decoration: const InputDecoration(
-                                labelText: 'Email Address',
-                              ),
-                              validator: (value) {
-                                if (value == null || !value.contains('@')) {
-                                  return 'Please enter a valid email address.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredEmail = value!;
-                              },
-                            ),
-                            TextFormField(
-                              key: const ValueKey('phonenumber'),
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: 'Phone Number',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your phone number.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredPhoneNumber = value!;
-                              },
-                            ),
-                            TextFormField(
-                              key: const ValueKey('governmentid'),
-                              keyboardType: TextInputType.text,
-                              decoration: const InputDecoration(
-                                labelText: 'Government ID',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your government ID.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredGovernmentId = value!;
-                              },
-                            ),
-                          ],
-                          TextFormField(
-                            key: const ValueKey('username'),
-                            autocorrect: false,
-                            textCapitalization: TextCapitalization.none,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter your username.';
-                              }
-                              return null;
-                            },
-                            onSaved: (value) {
-                              _enteredUsername = value!.trim();
-                            },
-                          ),
-                          TextFormField(
-                            key: const ValueKey('password'),
-                            obscureText: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
-                            ),
-                            validator: (value) {
-                              _tempPassword = value;
-                              if (value == null || value.trim().length < 6) {
-                                return 'Password must be at least 6 characters long.';
-                              }
-                              return null;
-                            },
-                            onSaved: (value) {
-                              _enteredPassword = value!.trim();
-                            },
-                          ),
-                          if (!_isLogin) ...[
-                            TextFormField(
-                              key: const ValueKey('confirmpassword'),
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Confirm Password',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please confirm your password.';
-                                }
-                                if (value != _tempPassword) {
-                                  return 'Passwords do not match.';
-                                }
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredConfirmPassword = value!;
-                              },
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          if (_isLogin) ...[
-                            // Role Selection for Login
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                InkWell(
-                                  onTap: () => _toggleRole('runner'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 12, horizontal: 20),
-                                    decoration: BoxDecoration(
-                                      color: _selectedRoles.contains('runner')
-                                          ? const Color(0xFF1DBF73)
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.directions_run,
-                                            color: _selectedRoles.contains('runner')
-                                                ? Colors.white
-                                                : Colors.black54),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Runner',
-                                          style: TextStyle(
-                                            color: _selectedRoles.contains('runner')
-                                                ? Colors.white
-                                                : Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                InkWell(
-                                  onTap: () => _toggleRole('task_poster'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 12, horizontal: 20),
-                                    decoration: BoxDecoration(
-                                      color: _selectedRoles.contains('task_poster')
-                                          ? const Color(0xFF1DBF73)
-                                          : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.assignment,
-                                            color: _selectedRoles.contains('task_poster')
-                                                ? Colors.white
-                                                : Colors.black54),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Task Poster',
-                                          style: TextStyle(
-                                            color: _selectedRoles.contains('task_poster')
-                                                ? Colors.white
-                                                : Colors.black54,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 20),
-                          if (_isLoading)
-                            const CircularProgressIndicator()
-                          else
-                            ElevatedButton(
-                              onPressed: _submit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1DBF73),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 30, vertical: 15),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text(
-                                _isLogin ? 'Login' : 'Signup',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLogin = !_isLogin;
-                                _selectedRoles.clear();
-                              });
-                            },
-                            child: Text(
-                              _isLogin
-                                  ? 'Create an account'
-                                  : 'I already have an account',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.secondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

@@ -39,6 +39,7 @@ class PostTaskScreen extends StatelessWidget {
                   _buildCategoryButton(context, Icons.delivery_dining, 'Delivery'),
                   _buildCategoryButton(context, Icons.handyman, 'Handyman'),
                   _buildCategoryButton(context, Icons.cleaning_services, 'Cleaning'),
+                  _buildCategoryButton(context, Icons.people, 'Event Staffing'),
                   _buildCategoryButton(context, Icons.local_shipping, 'Moving'),
                   _buildCategoryButton(context, Icons.grass, 'Gardening'),
                   _buildCategoryButton(context, Icons.computer, 'Tech'),

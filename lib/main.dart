@@ -20,9 +20,20 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Gigs',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1DBF73),
+        colorScheme: ColorScheme(
+          brightness: Brightness.light,
+          primary: const Color(0xFF11366A),
+          onPrimary: Colors.white,
+          secondary: const Color(0xFFEBF1FD),
+          onSecondary: const Color(0xFF11366A),
+          error: Colors.red,
+          onError: Colors.white,
+          background: const Color(0xFFF6F6F6),
+          onBackground: const Color(0xFF11366A),
+          surface: Colors.white,
+          onSurface: const Color(0xFF11366A),
         ),
+        scaffoldBackgroundColor: const Color(0xFFF6F6F6),
         useMaterial3: true,
       ),
       home: FutureBuilder<bool>(

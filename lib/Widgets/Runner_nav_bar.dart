@@ -20,24 +20,24 @@ class RunnerNavBar extends StatelessWidget {
       unselectedItemColor: Colors.grey,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.explore),
-          label: 'Explore',
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.local_offer),
+          label: 'My Offers',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.assignment),
-          label: 'Tasks',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.bar_chart),
-          label: 'Stats',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.notifications),
-          label: 'Notifications',
+          label: 'My Tasks',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.chat),
           label: 'Chat',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
         ),
       ],
     );

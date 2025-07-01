@@ -10,6 +10,7 @@ class MyTasksCard extends StatelessWidget {
   final String taskPosterImage;
   final VoidCallback onTap;
   final VoidCallback? onCancel;
+  final VoidCallback? onEdit;
 
   const MyTasksCard({
     Key? key,
@@ -22,17 +23,21 @@ class MyTasksCard extends StatelessWidget {
     this.taskPosterImage = 'https://via.placeholder.com/50',
     required this.onTap,
     this.onCancel,
+    this.onEdit,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      color: Theme.of(context).colorScheme.secondary,
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -42,18 +47,29 @@ class MyTasksCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       taskTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildStatusChip(status),
+                      _buildStatusChip(status, context),
+                      if (onEdit != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary, size: 20),
+                          tooltip: 'Edit Offer',
+                          onPressed: onEdit,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                       if (onCancel != null) ...[
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         IconButton(
                           icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
                           tooltip: 'Cancel Offer',
@@ -70,34 +86,39 @@ class MyTasksCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       taskType,
                       style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1DBF73).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
-                      '\$${offerAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Color(0xFF1DBF73),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.attach_money, size: 16, color: Theme.of(context).colorScheme.primary),
+                        Text(
+                          offerAmount.toStringAsFixed(2),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -113,7 +134,7 @@ class MyTasksCard extends StatelessWidget {
                   Text(
                     'Posted by $taskPoster',
                     style: TextStyle(
-                      color: Colors.grey.shade600,
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
@@ -128,19 +149,19 @@ class MyTasksCard extends StatelessWidget {
                       Icon(
                         Icons.calendar_today,
                         size: 16,
-                        color: Colors.grey.shade600,
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                       ),
                       const SizedBox(width: 4),
                       Text(
                         _formatDeadline(deadline),
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                           fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                  if (status == 'In Progress')
+                  if (status.toLowerCase() == 'in progress')
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -176,7 +197,7 @@ class MyTasksCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(String status, BuildContext context) {
     Color chipColor;
     Color textColor;
     IconData statusIcon;
@@ -198,32 +219,26 @@ class MyTasksCard extends StatelessWidget {
         statusIcon = Icons.pending_outlined;
         break;
       default:
-        chipColor = Colors.grey.shade50;
-        textColor = Colors.grey.shade700;
-        statusIcon = Icons.help_outline;
+        chipColor = Theme.of(context).colorScheme.secondary;
+        textColor = Theme.of(context).colorScheme.primary;
+        statusIcon = Icons.info_outline;
     }
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: chipColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            statusIcon,
-            size: 16,
-            color: textColor,
-          ),
+          Icon(statusIcon, size: 16, color: textColor),
           const SizedBox(width: 4),
           Text(
             status,
             style: TextStyle(
               color: textColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
             ),
           ),
         ],
