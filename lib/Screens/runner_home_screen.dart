@@ -31,6 +31,9 @@ import '../Widgets/chat_card.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'poster_home_screen.dart';
 import '../models/task_response.dart';
+import '../widgets/profile_screen_widget.dart';
+import 'package:geolocator/geolocator.dart';
+import '../Widgets/mytasks_runner_info.dart';
 
 class RunnerHomeScreen extends StatefulWidget {
   const RunnerHomeScreen({super.key});
@@ -43,7 +46,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
-  late Future<List<TaskResponse>> _tasksFuture;
+  late Future<List<TaskResponse>> _tasksFuture = Future.value([]);
   String _selectedCategory = 'All';
   Future<List<Map<String, dynamic>>>? _myOffersFuture;
   Future<List<Map<String, dynamic>>>? _acceptedOffersFuture;
@@ -62,9 +65,25 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Loads all tasks for the runner when the screen is initialized.
-    _tasksFuture = _taskService.getAllTasks().then((tasks) => tasks.map((t) => TaskResponse.fromJson(t.toJson())).toList());
+    _fetchNearbyTasks();
     _loadMyOffers();
+  }
+
+  Future<void> _fetchNearbyTasks() async {
+    try {
+      // For testing: use hardcoded location (31.248, 30.061) and radius 1
+      setState(() {
+        _tasksFuture = _taskService.getNearbyTasks(
+          latitude: 31.248,
+          longitude: 30.061,
+          radius: 300,
+        );
+      });
+    } catch (e) {
+      setState(() {
+        _tasksFuture = Future.error('Failed to fetch tasks: \\${e.toString()}');
+      });
+    }
   }
 
   /// Loads the offers and accepted offers for the current runner.
@@ -97,19 +116,18 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   /// Fetches all accepted offers by the runner and their associated tasks.
   /// Used by _loadMyOffers and the "My Tasks" tab.
   Future<List<Map<String, dynamic>>> _fetchAcceptedOffersWithTasks(String runnerId) async {
-    final offers = await _taskService.getOffersByRunner(runnerId);
-    List<Map<String, dynamic>> result = [];
-    for (final offer in offers) {
-      if (offer.status == OfferStatus.ACCEPTED) {
-        try {
-          final task = await _taskService.getTaskById(offer.taskId ?? offer.id);
-          result.add({'offer': offer, 'task': TaskResponse.fromJson(task.toJson())});
-        } catch (_) {
-          result.add({'offer': offer, 'task': null});
-        }
-      }
+    print('[DEBUG] _fetchAcceptedOffersWithTasks called with runnerId: $runnerId');
+    try {
+      // The getAcceptedOffersByRunner method now returns the data directly
+      final result = await _taskService.getAcceptedOffersByRunner(runnerId);
+      print('[DEBUG] getAcceptedOffersByRunner returned ${result.length} items');
+      
+      print('[DEBUG] _fetchAcceptedOffersWithTasks returning ${result.length} items');
+      return result;
+    } catch (e) {
+      print('[DEBUG] Error in _fetchAcceptedOffersWithTasks: $e');
+      rethrow;
     }
-    return result;
   }
 
   /// Deletes an offer by its ID. Used in the "My Proposals" tab when cancelling an offer.
@@ -287,172 +305,6 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     );
   }
 
-  /// Builds the profile screen for the runner. Used in the profile tab.
-  Widget _buildProfileScreen() {
-    return FutureBuilder<String?>(
-      future: TokenService.getToken(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
-          return Center(
-            child: Text('Not logged in. Please log in again.'),
-          );
-        }
-        final token = snapshot.data!;
-        Map<String, dynamic> user;
-        try {
-          user = JwtDecoder.decode(token);
-          print('Decoded JWT: ' + user.toString());
-        } catch (e) {
-          return Center(
-            child: Text('Invalid session. Please log in again.'),
-          );
-        }
-        final String name =
-          user['firstName'] != null && user['lastName'] != null
-            ? '${user['firstName']} ${user['lastName']}'
-            : user['firstName'] ?? user['username'] ?? user['name'] ?? user['sub'] ?? 'No Name';
-        final String email = user['email'] ?? '';
-        final String role = (user['roles'] is List && user['roles'].isNotEmpty) ? user['roles'][0] : (user['role'] ?? '');
-        final String initial = (user['firstName'] ?? user['username'] ?? 'U').toString().substring(0, 1).toUpperCase();
-        final int tasksDone = user['completedTasks'] ?? 0;
-        final double earnings = (user['earnings'] is num) ? user['earnings'].toDouble() : 0.0;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                elevation: 6,
-                color: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Color(0xFFEBF1FD), // soft blue
-                        Color(0xFFE3E6EA), // light silver
-                        Color(0xFFB0C4DE), // light steel blue
-                        Color(0xFFF8F8F8), // white
-                        Color(0xFFC0C0C0), // classic silver
-                        Color(0xFFB3D0F7), // blue-silver
-                        Color(0xFF11366A).withOpacity(0.08), // subtle brand blue
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.18),
-                        blurRadius: 16,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
-                          child: Text(initial, style: TextStyle(fontSize: 36, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(name, style: const TextStyle(fontSize: 22, color: Color(0xFF11366A), fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(role, style: TextStyle(fontSize: 16, color: Color(0xFF11366A).withOpacity(0.8))),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Column(
-                              children: [
-                                Text('$tasksDone', style: const TextStyle(fontSize: 18, color: Color(0xFF11366A), fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text('Tasks Done', style: TextStyle(fontSize: 13, color: Color(0xFF11366A).withOpacity(0.8))),
-                              ],
-                            ),
-                            const SizedBox(width: 32),
-                            Column(
-                              children: [
-                                Text('\u000024${earnings.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18, color: Color(0xFF11366A), fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 2),
-                                Text('Earnings', style: TextStyle(fontSize: 13, color: Color(0xFF11366A).withOpacity(0.8))),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => const PosterHomeScreen()),
-                    );
-                  },
-                  icon: const Icon(Icons.swap_horiz),
-                  label: const Text('Switch to Poster'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                elevation: 2,
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
-                      title: const Text('Edit Profile'),
-                      onTap: () {},
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.payment, color: Theme.of(context).colorScheme.primary),
-                      title: const Text('Payment History'),
-                      onTap: () {},
-                    ),
-                    ListTile(
-                      leading: Icon(Icons.support_agent, color: Theme.of(context).colorScheme.primary),
-                      title: const Text('Support'),
-                      onTap: () {},
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: Icon(Icons.logout, color: Colors.red),
-                      title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                      onTap: () async {
-                        await TokenService.clearAuthData();
-                        if (context.mounted) {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (context) => const AuthScreen()),
-                            (route) => false,
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   /// Builds the main body of the screen based on the selected tab.
   Widget _buildBody() {
     switch (_selectedIndex) {
@@ -466,9 +318,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  setState(() {
-                    _tasksFuture = _taskService.getAllTasks().then((tasks) => tasks.map((t) => TaskResponse.fromJson(t.toJson())).toList());
-                  });
+                  await _fetchNearbyTasks();
                 },
                 child: FutureBuilder<List<TaskResponse>>(
                   future: _tasksFuture,
@@ -582,7 +432,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                           MyTasksCard(
                             taskTitle: task.title,
                             taskType: task.category.name,
-                            status: offer.message, // You may want to map offer.status here
+                            status: offer.message,
                             deadline: task.additionalAttributes['startTime'] != null ? DateTime.tryParse(task.additionalAttributes['startTime']) ?? DateTime.now() : DateTime.now(),
                             offerAmount: offer.amount,
                             taskPoster: task.taskPoster.toString(),
@@ -708,6 +558,19 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                                 },
                               );
                             },
+                            onChat: () async {
+                              final myUserId = await TokenService.getUserId();
+                              final otherUserId = task.taskPoster.toString();
+                              final otherUserName = task.additionalRequirements['posterName'] ?? 'User #$otherUserId';
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ChatPage(
+                                    otherUserId: otherUserId,
+                                    otherUserName: otherUserName,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       );
@@ -724,11 +587,22 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
         // The user can tap a task to view details or raise a dispute for cancelled tasks.
         return RefreshIndicator(
           onRefresh: () async {
+            print('[DEBUG] Refreshing My Tasks tab');
             await _loadMyOffers();
           },
           child: FutureBuilder<List<Map<String, dynamic>>>(
             future: _acceptedOffersFuture,
             builder: (context, snapshot) {
+              print('[DEBUG] My Tasks FutureBuilder - ConnectionState: ${snapshot.connectionState}');
+              print('[DEBUG] My Tasks FutureBuilder - HasError: ${snapshot.hasError}');
+              print('[DEBUG] My Tasks FutureBuilder - HasData: ${snapshot.hasData}');
+              if (snapshot.hasError) {
+                print('[DEBUG] My Tasks FutureBuilder - Error: ${snapshot.error}');
+              }
+              if (snapshot.hasData) {
+                print('[DEBUG] My Tasks FutureBuilder - Data length: ${snapshot.data?.length}');
+              }
+              
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -737,6 +611,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
               }
               final data = snapshot.data ?? [];
               if (data.isEmpty) {
+                print('[DEBUG] My Tasks tab - No data to display');
                 return const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -767,13 +642,29 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                   ),
                 );
               }
+              print('[DEBUG] My Tasks tab - Processing ${data.length} items');
+              
               // Split tasks by status
               final inProgress = data.where((item) {
                 final status = (item['task'] as TaskResponse?)?.status?.toLowerCase();
-                return status == 'in progress' || status == 'accepted';
+                print('[DEBUG] Task status: $status');
+                // Handle different status formats
+                return status == 'in progress' || 
+                       status == 'in_progress' || 
+                       status == 'accepted' ||
+                       status == 'inprogress';
               }).toList();
-              final completed = data.where((item) => (item['task'] as TaskResponse?)?.status?.toLowerCase() == 'completed').toList();
-              final cancelled = data.where((item) => (item['task'] as TaskResponse?)?.status?.toLowerCase() == 'cancelled').toList();
+              final completed = data.where((item) {
+                final status = (item['task'] as TaskResponse?)?.status?.toLowerCase();
+                return status == 'completed' || status == 'done';
+              }).toList();
+              final cancelled = data.where((item) {
+                final status = (item['task'] as TaskResponse?)?.status?.toLowerCase();
+                return status == 'cancelled' || status == 'canceled';
+              }).toList();
+              
+              print('[DEBUG] My Tasks tab - In Progress: ${inProgress.length}, Completed: ${completed.length}, Cancelled: ${cancelled.length}');
+              
               return ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
@@ -792,6 +683,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ...inProgress.map((item) {
                       final offer = item['offer'] as Offer;
                       final task = item['task'] as TaskResponse;
+                      print('[DEBUG] Displaying in-progress task: ${task.title}');
                       return MyTasksCard(
                         taskTitle: task.title,
                         taskType: task.category.name,
@@ -801,7 +693,27 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                         taskPoster: 'Task Poster #${task.taskPoster}',
                         taskPosterImage: 'https://via.placeholder.com/50',
                         onTap: () {
-                          // Navigates to accepted task detail screen (implement if needed)
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => MyTasksRunnerInfo(
+                                task: task,
+                                onChat: null, // handled in MyTasksRunnerInfo
+                              ),
+                            ),
+                          );
+                        },
+                        onChat: () async {
+                          final myUserId = await TokenService.getUserId();
+                          final otherUserId = task.taskPoster.toString();
+                          final otherUserName = task.additionalRequirements['posterName'] ?? 'User #$otherUserId';
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ChatPage(
+                                otherUserId: otherUserId,
+                                otherUserName: otherUserName,
+                              ),
+                            ),
+                          );
                         },
                       );
                     }).toList(),
@@ -821,6 +733,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ...completed.map((item) {
                       final offer = item['offer'] as Offer;
                       final task = item['task'] as TaskResponse;
+                      print('[DEBUG] Displaying completed task: ${task.title}');
                       return MyTasksCard(
                         taskTitle: task.title,
                         taskType: task.category.name,
@@ -850,6 +763,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ...cancelled.map((item) {
                       final offer = item['offer'] as Offer;
                       final task = item['task'] as TaskResponse;
+                      print('[DEBUG] Displaying cancelled task: ${task.title}');
                       return Row(
                         children: [
                           Expanded(
@@ -909,7 +823,15 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
         );
       case 4: // Profile
         // Profile Tab: Shows the runner's profile, stats, and allows switching roles or logging out.
-        return _buildProfileScreen();
+        return ProfileScreenWidget(
+          isRunner: true,
+          onSwitchRole: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const PosterHomeScreen()),
+            );
+          },
+          switchRoleLabel: 'Switch to Poster',
+        );
       default:
         return const Center(
           child: Text('Unknown Tab'),

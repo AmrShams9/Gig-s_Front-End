@@ -1,14 +1,22 @@
 /// event_task.dart
 /// --------------
 /// Data model for event staffing tasks. Used for posting and displaying event-specific fields.
+///
+/// This model is focused on event-specific data. For unified task handling, consider using a base Task model and extending it for event tasks.
+///
+/// Usage:
+///   - Used for creating, serializing, and displaying event staffing tasks.
+///   - Maps to/from backend event task objects.
+///
+/// See also: EventTaskCard (UI widget for displaying this model)
 /// Fields: taskId, taskPoster, title, description, type, taskType, longitude, latitude, createdDate, additionalRequirements, status, location, fixedPay, requiredPeople, runnerIds, startDate, endDate, numberOfDays.
 ///
 /// Suggestions:
-/// - Keep this model focused on event-specific data. For unified task handling, consider using a base Task model and extending it for event tasks.
 /// - Move any business logic (e.g., validation) out of the model.
 /// - Document any mapping to/from backend or TaskResponse.
 import 'package:flutter/material.dart';
 
+/// Data model for event staffing tasks.
 class EventTask {
   final int? taskId;
   final int taskPoster;
@@ -48,8 +56,12 @@ class EventTask {
     required this.startDate,
     required this.endDate,
     required this.numberOfDays,
-  });
+  })  : assert(location.isNotEmpty, 'location must not be empty'),
+        assert(fixedPay > 0, 'fixedPay must be greater than zero'),
+        assert(startDate.isNotEmpty, 'startDate must not be empty'),
+        assert(endDate.isNotEmpty, 'endDate must not be empty');
 
+  /// Creates an EventTask from a JSON map (e.g., from backend response).
   factory EventTask.fromJson(Map<String, dynamic> json) {
     return EventTask(
       taskId: json['taskId'] as int?,
@@ -73,8 +85,10 @@ class EventTask {
     );
   }
 
+  /// Converts this EventTask to a JSON map (e.g., for sending to backend).
+  /// Only includes non-null fields and omits irrelevant fields for event tasks.
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'taskId': taskId,
       'taskPoster': taskPoster,
       'title': title,
@@ -94,5 +108,8 @@ class EventTask {
       'endDate': endDate,
       'numberOfDays': numberOfDays,
     };
+    // Remove nulls
+    map.removeWhere((key, value) => value == null);
+    return map;
   }
 }

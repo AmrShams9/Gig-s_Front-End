@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/task_response.dart';
 import '../Screens/task_detail_screen.dart';
+import '../services/task_service.dart';
 
 class TaskCard extends StatelessWidget {
   final TaskResponse task;
@@ -177,11 +178,29 @@ class TaskCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               // Proposals count
-              Text('Proposals: 20 to 50', style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.7))),
+              FutureBuilder<int>(
+                future: task.taskId != null ? _fetchOffersCount(task.taskId) : Future.value(0),
+                builder: (context, snapshot) {
+                  final offersCount = snapshot.data ?? 0;
+                  final maxProposals = task.additionalRequirements['maxProposals'] != null
+                      ? int.tryParse(task.additionalRequirements['maxProposals'].toString()) ?? 50
+                      : 50;
+                  return Text(
+                    'Proposals: $offersCount / $maxProposals',
+                    style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.7)),
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<int> _fetchOffersCount(int taskId) async {
+    final taskService = TaskService();
+    final offers = await taskService.getOffersForTask(taskId);
+    return offers.length;
   }
 }

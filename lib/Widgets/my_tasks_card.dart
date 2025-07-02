@@ -11,6 +11,7 @@ class MyTasksCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onCancel;
   final VoidCallback? onEdit;
+  final VoidCallback? onChat;
 
   const MyTasksCard({
     Key? key,
@@ -24,6 +25,7 @@ class MyTasksCard extends StatelessWidget {
     required this.onTap,
     this.onCancel,
     this.onEdit,
+    this.onChat,
   }) : super(key: key);
 
   @override
@@ -141,6 +143,19 @@ class MyTasksCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
+              if (onChat != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: onChat,
+                    icon: const Icon(Icons.chat),
+                    label: const Text('Chat with User'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

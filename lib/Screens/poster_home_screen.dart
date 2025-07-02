@@ -9,6 +9,7 @@
 /// - Use state management (Provider, Riverpod, Bloc) for complex state.
 /// - Remove commented-out or unused code.
 import 'package:flutter/material.dart';
+import '../Widgets/offers_card.dart';
 import '../widgets/task_poster_nav_bar.dart';
 import 'post_task_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -23,7 +24,7 @@ import 'task_form_screen.dart';
 import 'Chat_messages.dart';
 import '../services/user_service.dart';
 import '../models/user.dart';
-import '../widgets/offers_card.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/chat_service.dart';
 import '../Screens/chat_page.dart';
@@ -33,6 +34,9 @@ import 'runner_home_screen.dart';
 import '../models/event_task.dart';
 import '../models/task_response.dart';
 import '../widgets/task_card.dart';
+import '../widgets/event_task_card.dart';
+import '../widgets/profile_screen_widget.dart';
+import '../widgets/poster_task_card.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
@@ -51,7 +55,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
   final UserService _userService = UserService();
-  late Future<List<Map<String, dynamic>>> _tasksFuture;
+  late Future<List<TaskResponse>> _openTasksFuture = Future.value([]);
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Moving', 'icon': Icons.local_shipping},
     {'name': 'Cleaning', 'icon': Icons.cleaning_services},
@@ -68,7 +72,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _tasksFuture = _loadTasks();
+    _fetchOpenTasks();
     _loadUsers();
   }
 
@@ -84,10 +88,23 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _loadTasks() async {
+  Future<void> _fetchOpenTasks() async {
     final userId = await TokenService.getUserId();
-    if (userId == null) throw Exception('User not authenticated');
-    return _taskService.getTasksByPosterRaw(userId);
+    if (userId == null) {
+      setState(() {
+        _openTasksFuture = Future.error('User not authenticated');
+      });
+      return;
+    }
+    setState(() {
+      _openTasksFuture = _fetchAndCombineOpenTasks(int.parse(userId));
+    });
+  }
+
+  Future<List<TaskResponse>> _fetchAndCombineOpenTasks(int posterId) async {
+    final regularTasks = await _taskService.getOpenRegularTasksByPoster(posterId);
+    final eventTasks = await _taskService.getOpenEventTasksByPoster(posterId);
+    return [...regularTasks, ...eventTasks];
   }
 
   Future<int> _getOffersCount(String taskId) async {
@@ -95,24 +112,33 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     return offers.length;
   }
 
-  Widget _buildSummaryCards(List<TaskResponse> tasks) {
-    final statusCounts = {
-      'OPEN': 0,
-      'IN_PROGRESS': 0,
-      'COMPLETED': 0,
-      'CANCELLED': 0,
+  Future<Map<String, int>> _fetchStatusCounts() async {
+    final userIdStr = await TokenService.getUserId();
+    if (userIdStr == null) throw Exception('User not authenticated');
+    final userId = int.parse(userIdStr);
+    final open = await _taskService.getTaskCountByStatus(userId: userId, status: 'OPEN');
+    final inProgress = await _taskService.getTaskCountByStatus(userId: userId, status: 'IN_PROGRESS');
+    final done = await _taskService.getTaskCountByStatus(userId: userId, status: 'DONE');
+    final completed = await _taskService.getTaskCountByStatus(userId: userId, status: 'COMPLETED');
+    final cancelled = await _taskService.getTaskCountByStatus(userId: userId, status: 'CANCELLED');
+    return {
+      'OPEN': open,
+      'IN_PROGRESS': inProgress,
+      'DONE': done,
+      'COMPLETED': completed,
+      'CANCELLED': cancelled,
     };
-    for (final t in tasks) {
-      final s = t.status.toUpperCase();
-      if (statusCounts.containsKey(s)) statusCounts[s] = statusCounts[s]! + 1;
-    }
+  }
+
+  Widget _buildSummaryCardsFromCounts(Map<String, int> statusCounts) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildStatusCard('Open', statusCounts['OPEN']!, Colors.blue),
-        _buildStatusCard('In Progress', statusCounts['IN_PROGRESS']!, Colors.orange),
-        _buildStatusCard('Completed', statusCounts['COMPLETED']!, Colors.green),
-        _buildStatusCard('Cancelled', statusCounts['CANCELLED']!, Colors.red),
+        _buildStatusCard('Open', statusCounts['OPEN'] ?? 0, Colors.blue),
+        _buildStatusCard('In Progress', statusCounts['IN_PROGRESS'] ?? 0, Colors.orange),
+        _buildStatusCard('Done', statusCounts['DONE'] ?? 0, Colors.purple),
+        _buildStatusCard('Completed', statusCounts['COMPLETED'] ?? 0, Colors.green),
+        _buildStatusCard('Cancelled', statusCounts['CANCELLED'] ?? 0, Colors.red),
       ],
     );
   }
@@ -176,10 +202,51 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
       future: _getOffersCount(task.taskId.toString()),
       builder: (context, snapshot) {
         final offersCount = snapshot.data ?? 0;
-        return TaskCard(
+        return PosterTaskCard(
           task: task,
-          onTap: () {
-            // TODO: Navigate to task detail
+          offerCount: offersCount,
+          onEdit: () {
+            // TODO: Implement edit navigation
+          },
+          onDelete: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete Task'),
+                content: const Text('Are you sure you want to delete this task? This action cannot be undone.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              final result = await _taskService.deleteTaskById(task.taskId);
+              if (result['success']) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Task deleted successfully!')),
+                );
+                final userIdStr = await TokenService.getUserId();
+                if (userIdStr != null) {
+                  setState(() {
+                    _openTasksFuture = _fetchAndCombineOpenTasks(int.parse(userIdStr));
+                  });
+                }
+              } else {
+                print('Failed to delete task. Server response:');
+                print('Error: \\${result['error']}');
+                if (result.containsKey('data')) print('Data: \\${result['data']}');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to delete task. Please try again.')),
+                );
+              }
+            }
           },
         );
       },
@@ -187,19 +254,11 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _tasksFuture,
+    return FutureBuilder<List<TaskResponse>>(
+      future: _openTasksFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: \\${snapshot.error}'));
-        }
         final tasks = snapshot.data ?? [];
-        final taskResponses = tasks.map((t) => TaskResponse.fromJson(t)).toList();
-        return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 0),
+        return Column(
           children: [
             // Modern header
             FutureBuilder<String?>(
@@ -274,14 +333,44 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
               },
             ),
             const SizedBox(height: 8),
-            _buildSummaryCards(taskResponses),
+            FutureBuilder<Map<String, int>>(
+              future: _fetchStatusCounts(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error loading status counts'));
+                }
+                return _buildSummaryCardsFromCounts(snapshot.data ?? {});
+              },
+            ),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('My Tasks', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
             ),
             const SizedBox(height: 8),
-            ...taskResponses.map((task) => _buildTaskCard(task)).toList(),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await _fetchOpenTasks();
+                },
+                child: snapshot.connectionState == ConnectionState.waiting
+                    ? const Center(child: CircularProgressIndicator())
+                    : snapshot.hasError
+                        ? Center(child: Text('An error occurred: \\${snapshot.error}'))
+                        : (tasks.isEmpty
+                            ? const Center(child: Text('No open tasks available.'))
+                            : ListView.builder(
+                                itemCount: tasks.length,
+                                itemBuilder: (context, index) {
+                                  final task = tasks[index];
+                                  return _buildTaskCard(task);
+                                },
+                              )),
+              ),
+            ),
           ],
         );
       },
@@ -473,7 +562,15 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
       case 2:
         return _buildMessagesTab();
       case 3:
-        return _buildProfileTab();
+        return ProfileScreenWidget(
+          isRunner: false,
+          onSwitchRole: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const RunnerHomeScreen()),
+            );
+          },
+          switchRoleLabel: 'Switch to Runner',
+        );
       default:
         return const Center(child: Text('Unknown tab'));
     }
@@ -497,14 +594,20 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     return Scaffold(
       body: _buildBody(),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => const PostTaskScreen(),
-            ),
-          );
-          setState(() {
-            _tasksFuture = _loadTasks();
+        onPressed: () {
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute(
+                  builder: (context) => const PostTaskScreen(),
+                ),
+              )
+              .then((_) async {
+            final userIdStr = await TokenService.getUserId();
+            if (userIdStr != null) {
+              setState(() {
+                _openTasksFuture = _fetchAndCombineOpenTasks(int.parse(userIdStr));
+              });
+            }
           });
         },
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -570,7 +673,6 @@ class OffersListScreen extends StatelessWidget {
                     );
                     return;
                   }
-                  
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
@@ -591,25 +693,21 @@ class OffersListScreen extends StatelessWidget {
                   if (confirmed == true) {
                     final taskService = TaskService();
                     
-                    // First, accept the offer
+                    // Call only acceptOffer
                     final acceptResult = await taskService.acceptOffer(
-                      offerId: offer is Offer ? offer.id : '',
+                      offerId: offer.id,
                       taskId: int.parse(taskId),
                       taskPosterId: taskPosterId,
                     );
                     
                     if (acceptResult['success']) {
-                      // Then update task status to IN_PROGRESS
                       final statusResult = await taskService.updateTaskStatusToInProgress(
                         int.parse(taskId),
                       );
-                      
                       if (statusResult['success']) {
-                        // Finally, delete all other offers for this task
                         final deleteResult = await taskService.deleteAllOffersForTask(
                           int.parse(taskId),
                         );
-                        
                         if (deleteResult['success']) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -780,111 +878,6 @@ class _PosterChatTabWithSearchAndSettingsState extends State<_PosterChatTabWithS
           ),
         ),
       ],
-    );
-  }
-}
-
-class EventTaskCard extends StatelessWidget {
-  final EventTask eventTask;
-  const EventTaskCard({Key? key, required this.eventTask}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Posted: \\${eventTask.createdDate?.toString() ?? ''}',
-              style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.6)),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              eventTask.title,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      eventTask.type?.isNotEmpty == true ? eventTask.type : '',
-                      style: TextStyle(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.attach_money, size: 16, color: theme.colorScheme.primary),
-                      Text(
-                        eventTask.fixedPay.toStringAsFixed(0),
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text('People: \\${eventTask.requiredPeople}', style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.7)), overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              eventTask.description?.isNotEmpty == true ? eventTask.description : '',
-              style: TextStyle(fontSize: 15, color: theme.colorScheme.primary.withOpacity(0.85)),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 16, color: theme.colorScheme.primary.withOpacity(0.7)),
-                const SizedBox(width: 4),
-                Text(eventTask.location?.isNotEmpty == true ? eventTask.location : '', style: TextStyle(color: theme.colorScheme.primary.withOpacity(0.7), fontSize: 14)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: theme.colorScheme.primary.withOpacity(0.7)),
-                const SizedBox(width: 4),
-                Text('From: \\${eventTask.startDate?.toString() ?? ''} To: \\${eventTask.endDate?.toString() ?? ''}', style: TextStyle(color: theme.colorScheme.primary.withOpacity(0.7), fontSize: 14)),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 } 

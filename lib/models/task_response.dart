@@ -41,6 +41,12 @@ class TaskResponse {
   final double amount;
   final Map<String, dynamic> additionalAttributes;
   final int? runnerId;
+  final String? location;
+  final double? fixedPay;
+  final int? requiredPeople;
+  final String? startDate;
+  final String? endDate;
+  final int? numberOfDays;
 
   TaskResponse({
     required this.taskId,
@@ -56,6 +62,12 @@ class TaskResponse {
     required this.additionalAttributes,
     required this.runnerId,
     this.createdDate,
+    this.location,
+    this.fixedPay,
+    this.requiredPeople,
+    this.startDate,
+    this.endDate,
+    this.numberOfDays,
   });
 
   factory TaskResponse.fromJson(Map<String, dynamic> json) {
@@ -120,6 +132,12 @@ class TaskResponse {
       additionalAttributes:
           Map<String, dynamic>.from(json['additionalAttributes'] ?? {}),
       runnerId: json['runnerId'] != null ? parseInt(json['runnerId']) : null,
+      location: json['location'] as String?,
+      fixedPay: json['fixedPay'] != null ? (json['fixedPay'] as num).toDouble() : null,
+      requiredPeople: json['requiredPeople'] as int?,
+      startDate: json['startDate'] as String?,
+      endDate: json['endDate'] as String?,
+      numberOfDays: json['numberOfDays'] as int?,
     );
   }
 
@@ -137,6 +155,12 @@ class TaskResponse {
       'amount': amount,
       'additionalAttributes': additionalAttributes,
       'runnerId': runnerId,
+      'location': location,
+      'fixedPay': fixedPay,
+      'requiredPeople': requiredPeople,
+      'startDate': startDate,
+      'endDate': endDate,
+      'numberOfDays': numberOfDays,
     };
   }
 } 

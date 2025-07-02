@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/task.dart';
+import '../models/task_response.dart';
 import '../services/task_service.dart';
 import '../services/token_service.dart';
 import 'poster_home_screen.dart';
@@ -76,7 +77,8 @@ class _MyTasksScreenState extends State<MyTasksScreen> {
     );
     if (confirm != true) return;
 
-    final result = await _taskService.deleteTask(int.parse(task.taskId!), userId);
+    final taskResponse = TaskResponse.fromJson(task.toJson());
+    final result = await _taskService.deleteTask(taskResponse, userId);
     if (mounted) {
       if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -15,6 +15,7 @@ class OffersCard extends StatelessWidget {
   final DateTime timestamp;
   final double rating;
   final VoidCallback? onAccept;
+  final VoidCallback? onChat;
   final String? offerId;
   final String? taskId;
   final int? taskPosterId;
@@ -30,6 +31,7 @@ class OffersCard extends StatelessWidget {
     required this.timestamp,
     this.rating = 4.5,
     this.onAccept,
+    this.onChat,
     this.offerId,
     this.taskId,
     this.taskPosterId,
@@ -125,6 +127,33 @@ class OffersCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _canAcceptOffer && onAccept != null ? onAccept : null,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Accept Offer'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: onChat,
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Chat'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

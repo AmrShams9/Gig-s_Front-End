@@ -8,9 +8,10 @@
 /// - Split out large widgets (e.g., offer dialog, requirements section) into separate files in Widgets/.
 /// - Use state management for complex state.
 import 'package:flutter/material.dart';
+import '../Widgets/offers_card.dart';
 import '../models/task_response.dart';
 import '../widgets/questions_card.dart';
-import '../widgets/offers_card.dart';
+
 import '../services/task_service.dart';
 import '../services/token_service.dart';
 import '../models/offer.dart';
