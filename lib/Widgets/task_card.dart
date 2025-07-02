@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../models/task.dart';
+import '../models/task_response.dart';
+import '../Screens/task_detail_screen.dart';
 
 class TaskCard extends StatelessWidget {
-  final Task task;
+  final TaskResponse task;
   final VoidCallback onTap;
 
   const TaskCard({
@@ -15,7 +16,13 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TaskDetailScreen(task: task),
+          ),
+        );
+      },
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         elevation: 2,
@@ -48,7 +55,7 @@ class TaskCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        task.type,
+                        task.category.name,
                         style: TextStyle(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w600,
@@ -70,7 +77,7 @@ class TaskCard extends StatelessWidget {
                       children: [
                         Icon(Icons.attach_money, size: 16, color: theme.colorScheme.primary),
                         Text(
-                          (task.amount ?? 0).toStringAsFixed(0),
+                          (task.amount).toStringAsFixed(0),
                           style: TextStyle(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
@@ -97,25 +104,25 @@ class TaskCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               // Event Staffing Fields
-              if (task.type == 'EVENT_STAFFING' && task.fixedPay != null)
-                Text('Fixed Pay: \$${task.fixedPay}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
-              if (task.type == 'EVENT_STAFFING' && task.requiredPeople != null)
-                Text('Required People: \${task.requiredPeople}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
-              if (task.type == 'EVENT_STAFFING' && task.location != null)
-                Text('Location: \${task.location}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
-              if (task.type == 'EVENT_STAFFING' && task.startDate != null && task.endDate != null)
-                Text('From: \${task.startDate} To: \${task.endDate}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
-              if (task.type == 'EVENT_STAFFING' && task.numberOfDays != null)
-                Text('Number of Days: \${task.numberOfDays}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.category.name == 'EventStaffing' && task.additionalAttributes['fixedPay'] != null)
+                Text('Fixed Pay: \$${task.additionalAttributes['fixedPay']}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.category.name == 'EventStaffing' && task.additionalAttributes['requiredPeople'] != null)
+                Text('Required People: ${task.additionalAttributes['requiredPeople']}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.category.name == 'EventStaffing' && task.additionalAttributes['location'] != null)
+                Text('Location: ${task.additionalAttributes['location']}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.category.name == 'EventStaffing' && task.additionalAttributes['startDate'] != null && task.additionalAttributes['endDate'] != null)
+                Text('From: ${task.additionalAttributes['startDate']} To: ${task.additionalAttributes['endDate']}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
+              if (task.category.name == 'EventStaffing' && task.additionalAttributes['numberOfDays'] != null)
+                Text('Number of Days: ${task.additionalAttributes['numberOfDays']}', style: TextStyle(fontSize: 14, color: theme.colorScheme.primary)),
               const SizedBox(height: 10),
               // Tags (example tags, replace with real tags if available)
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    if (task.additionalRequirements != null && task.additionalRequirements!['tags'] != null)
-                      ...List.generate((task.additionalRequirements!['tags'] as List).length, (i) {
-                        final tag = task.additionalRequirements!['tags'][i];
+                    if (task.additionalRequirements['tags'] != null)
+                      ...List.generate((task.additionalRequirements['tags'] as List).length, (i) {
+                        final tag = task.additionalRequirements['tags'][i];
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Chip(
@@ -128,7 +135,10 @@ class TaskCard extends StatelessWidget {
                       })
                     else ...[
                       Chip(
-                        label: const Text('Regular'),
+                        label: Text(
+                          task.category.name == 'EventStaffing' ? 'Event Staffing' : 'Regular',
+                          style: TextStyle(color: theme.colorScheme.primary),
+                        ),
                         backgroundColor: theme.colorScheme.secondary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
@@ -158,9 +168,9 @@ class TaskCard extends StatelessWidget {
                   ),
                   Icon(Icons.location_on, color: theme.colorScheme.primary, size: 18),
                   Text(
-                    (task.additionalRequirements != null && task.additionalRequirements!['posterName'] != null)
-                      ? task.additionalRequirements!['posterName']
-                      : (task.taskPoster != null ? 'User #${task.taskPoster}' : 'Unknown'),
+                    (task.additionalRequirements['posterName'] != null)
+                      ? task.additionalRequirements['posterName']
+                      : 'User #${task.taskPoster}',
                     style: TextStyle(fontSize: 13, color: theme.colorScheme.primary.withOpacity(0.7)),
                   ),
                 ],

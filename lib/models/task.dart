@@ -1,3 +1,11 @@
+/// task.dart
+/// ---------
+/// Data model for general tasks (non-event). Used for creating and displaying regular tasks.
+/// Fields: (list all fields here for clarity).
+///
+/// Suggestions:
+/// - Consider unifying with EventTask for a single Task model with optional event fields.
+/// - Keep this model as a pure data container; move logic elsewhere.
 import 'question.dart';
 import 'offer.dart';
 import 'package:flutter/material.dart';

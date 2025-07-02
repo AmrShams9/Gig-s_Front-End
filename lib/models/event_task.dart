@@ -1,3 +1,12 @@
+/// event_task.dart
+/// --------------
+/// Data model for event staffing tasks. Used for posting and displaying event-specific fields.
+/// Fields: taskId, taskPoster, title, description, type, taskType, longitude, latitude, createdDate, additionalRequirements, status, location, fixedPay, requiredPeople, runnerIds, startDate, endDate, numberOfDays.
+///
+/// Suggestions:
+/// - Keep this model focused on event-specific data. For unified task handling, consider using a base Task model and extending it for event tasks.
+/// - Move any business logic (e.g., validation) out of the model.
+/// - Document any mapping to/from backend or TaskResponse.
 import 'package:flutter/material.dart';
 
 class EventTask {

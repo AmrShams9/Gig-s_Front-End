@@ -1,63 +1,125 @@
+/// task_response.dart
+/// ------------------
+/// Model representing a Task returned from the backend (response).
+/// Handles mapping from backend JSON, including category normalization logic.
+/// Fields: taskId, taskPoster, title, description, createdDate, category, longitude, latitude, additionalRequirements, status, amount, additionalAttributes, runnerId.
+///
+/// Suggestions:
+/// - Consider moving debug print statements to a logger or removing for production.
+/// - Keep category normalization logic well-documented.
+/// - If possible, unify with other task models for consistency.
+import '../models/task.dart';
 import 'question.dart';
 import 'offer.dart';
 import 'package:flutter/material.dart';
 
-class Task {
-  final String? taskId;
+enum Category {
+  Cleaning,
+  EventStaffing,
+  Delivery,
+  Handyman,
+  Moving,
+  Technology,
+  Gardening,
+  Grocery,
+  Event,
+  Other,
+}
+
+/// Model representing a Task returned from the backend (response)
+class TaskResponse {
+  final int taskId;
   final int taskPoster;
   final String title;
   final String description;
-  final String type;
-  final String taskType;
-  final String? status;
-  final double? longitude;
-  final double? latitude;
-  final Map<String, dynamic>? additionalRequirements;
-  final Map<String, dynamic>? additionalAttributes;
+  final String? createdDate;
+  final Category category;
+  final double longitude;
+  final double latitude;
+  final Map<String, dynamic> additionalRequirements;
+  final String status;
   final double amount;
-  final List<Question>? questions;
-  final List<Offer>? offers;
-  final double? price;
-  final String? duration;
-  final DateTime? startTime;
-  final DateTime? endTime;
+  final Map<String, dynamic> additionalAttributes;
+  final int? runnerId;
 
-  Task({
-    this.taskId,
+  TaskResponse({
+    required this.taskId,
     required this.taskPoster,
     required this.title,
     required this.description,
-    required this.type,
-    this.taskType = 'REGULAR',
-    this.status,
-    this.longitude,
-    this.latitude,
-    this.additionalRequirements,
-    this.additionalAttributes,
+    required this.category,
+    required this.longitude,
+    required this.latitude,
+    required this.additionalRequirements,
+    required this.status,
     required this.amount,
-    this.questions,
-    this.offers,
-    this.price,
-    this.duration,
-    this.startTime,
-    this.endTime,
+    required this.additionalAttributes,
+    required this.runnerId,
+    this.createdDate,
   });
 
-  factory Task.fromJson(Map<String, dynamic> json) {
-    return Task(
-      taskId: json['taskId']?.toString(),
-      taskPoster: json['taskPoster'] as int,
-      title: json['title'] as String,
-      description: json['description'] as String,
-      type: json['type'] as String,
-      taskType: json['task_type'] as String? ?? 'REGULAR',
-      status: json['status'] as String?,
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      additionalRequirements: json['additionalRequirements'] as Map<String, dynamic>?,
-      additionalAttributes: json['additionalAttributes'] as Map<String, dynamic>?,
-      amount: (json['amount'] as num).toDouble(),
-      // 'questions' and 'offers' are not in the provided JSON, so they can be null
+  factory TaskResponse.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    int parseInt(dynamic value) {
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    String normalizeCategory(String? raw) {
+      if (raw == null) return 'Other';
+      return raw.replaceAll(' ', '').replaceAll('_', '').toLowerCase();
+    }
+
+    // Debug statements for category mapping
+    print('[DEBUG] Incoming type: \\${json['type']}');
+    for (var e in Category.values) {
+      print('[DEBUG] Enum: \\${e.name} | Normalized: \\${normalizeCategory(e.name)}');
+    }
+    print('[DEBUG] Normalized incoming: \\${normalizeCategory(json['type'])}');
+
+    final matchedCategory = Category.values.firstWhere(
+      (e) => normalizeCategory(e.name) == normalizeCategory(json['type']),
+      orElse: () => Category.Other,
+    );
+    print('[DEBUG] Matched category: \\${matchedCategory.name}');
+
+    // Debug statements for each attribute
+    print('[DEBUG] createdDate: \\${json['createdDate']} (type: \\${json['createdDate']?.runtimeType})');
+    print('[DEBUG] taskId: \\${json['taskId']} (type: \\${json['taskId']?.runtimeType})');
+    print('[DEBUG] taskPoster: \\${json['taskPoster']} (type: \\${json['taskPoster']?.runtimeType})');
+    print('[DEBUG] title: \\${json['title']} (type: \\${json['title']?.runtimeType})');
+    print('[DEBUG] description: \\${json['description']} (type: \\${json['description']?.runtimeType})');
+    print('[DEBUG] type: \\${json['type']} (type: \\${json['type']?.runtimeType})');
+    print('[DEBUG] longitude: \\${json['longitude']} (type: \\${json['longitude']?.runtimeType})');
+    print('[DEBUG] latitude: \\${json['latitude']} (type: \\${json['latitude']?.runtimeType})');
+    print('[DEBUG] additionalRequirements: \\${json['additionalRequirements']} (type: \\${json['additionalRequirements']?.runtimeType})');
+    print('[DEBUG] status: \\${json['status']} (type: \\${json['status']?.runtimeType})');
+    print('[DEBUG] amount: \\${json['amount']} (type: \\${json['amount']?.runtimeType})');
+    print('[DEBUG] additionalAttributes: \\${json['additionalAttributes']} (type: \\${json['additionalAttributes']?.runtimeType})');
+    print('[DEBUG] runnerId: \\${json['runnerId']} (type: \\${json['runnerId']?.runtimeType})');
+
+    return TaskResponse(
+      createdDate: json['createdDate'],
+      taskId: parseInt(json['taskId']),
+      taskPoster: parseInt(json['taskPoster']),
+      title: json['title'],
+      description: json['description'],
+      category: matchedCategory,
+      longitude: parseDouble(json['longitude']),
+      latitude: parseDouble(json['latitude']),
+      additionalRequirements:
+          Map<String, dynamic>.from(json['additionalRequirements'] ?? {}),
+      status: json['status'],
+      amount: parseDouble(json['amount']),
+      additionalAttributes:
+          Map<String, dynamic>.from(json['additionalAttributes'] ?? {}),
+      runnerId: json['runnerId'] != null ? parseInt(json['runnerId']) : null,
     );
   }
 
@@ -67,14 +129,14 @@ class Task {
       'taskPoster': taskPoster,
       'title': title,
       'description': description,
-      'type': type,
-      'task_type': taskType,
-      'status': status,
+      'type': category.name,
       'longitude': longitude,
       'latitude': latitude,
       'additionalRequirements': additionalRequirements,
-      'additionalAttributes': additionalAttributes,
+      'status': status,
       'amount': amount,
+      'additionalAttributes': additionalAttributes,
+      'runnerId': runnerId,
     };
   }
 } 

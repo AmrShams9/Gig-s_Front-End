@@ -1,3 +1,11 @@
+/// user.dart
+/// ---------
+/// Data model for users in the system. Used for authentication, profile display, and user-related logic.
+/// Fields: (list all fields here for clarity).
+///
+/// Suggestions:
+/// - Keep this model as a pure data container.
+/// - Document any mapping to/from backend or auth services.
 class UserModel {
   final String id;
   final String email;

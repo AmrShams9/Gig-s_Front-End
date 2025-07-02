@@ -1,3 +1,12 @@
+/// accepted_task_detail_screen.dart
+/// -------------------------------
+/// Screen for displaying details of a task that has been accepted by a runner, including task info, offer details, and progress.
+/// Allows runners to view emergency options and communicate with the task poster.
+///
+/// Suggestions:
+/// - Move business logic (e.g., data fetching, emergency actions) to services or providers.
+/// - Split out large widgets (e.g., emergency button, offer details) into separate files in Widgets/.
+/// - Use state management for complex state.
 import 'package:flutter/material.dart';
 import '../models/task.dart';
 import '../models/offer.dart';

@@ -1,5 +1,14 @@
+/// task_detail_screen.dart
+/// ----------------------
+/// Screen for displaying the details of a single task, including offers, requirements, and Q&A.
+/// Allows runners to make offers and view task information in detail.
+///
+/// Suggestions:
+/// - Move business logic (e.g., offer posting, data fetching) to services or providers.
+/// - Split out large widgets (e.g., offer dialog, requirements section) into separate files in Widgets/.
+/// - Use state management for complex state.
 import 'package:flutter/material.dart';
-import '../models/task.dart';
+import '../models/task_response.dart';
 import '../widgets/questions_card.dart';
 import '../widgets/offers_card.dart';
 import '../services/task_service.dart';
@@ -7,7 +16,7 @@ import '../services/token_service.dart';
 import '../models/offer.dart';
 
 class TaskDetailScreen extends StatefulWidget {
-  final Task task;
+  final TaskResponse task;
 
   const TaskDetailScreen({Key? key, required this.task}) : super(key: key);
 
@@ -18,7 +27,7 @@ class TaskDetailScreen extends StatefulWidget {
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   final TaskService _taskService = TaskService();
 
-  Future<List<Offer>> get _offersFuture => _taskService.getOffersForTask(int.parse(widget.task.taskId!));
+  Future<List<Offer>> get _offersFuture => _taskService.getOffersForTask(widget.task.taskId);
 
   Future<void> _refreshOffers() async {
     setState(() {}); // Triggers rebuild and refetches offers
@@ -154,7 +163,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                     return;
                                   }
                                   final result = await _taskService.postOffer(
-                                    taskId: int.parse(widget.task.taskId!),
+                                    taskId: widget.task.taskId,
                                     runnerId: runnerId,
                                     amount: amount,
                                     message: message,
@@ -294,7 +303,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               Text('Duration', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
                               const SizedBox(height: 2),
                               Text(
-                                widget.task.duration ?? 'N/A',
+                                widget.task.additionalAttributes['duration'] ?? 'N/A',
                                 style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -306,7 +315,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               Text('Type', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
                               const SizedBox(height: 2),
                               Text(
-                                widget.task.type,
+                                widget.task.category.name,
                                 style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -424,7 +433,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         timestamp: offer.timestamp,
                         rating: 4.5, // Placeholder
                         offerId: offer.id,
-                        taskId: widget.task.taskId,
+                        taskId: widget.task.taskId.toString(),
                         taskPosterId: widget.task.taskPoster,
                         status: offer.status,
                       );

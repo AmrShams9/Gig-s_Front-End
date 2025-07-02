@@ -1,3 +1,13 @@
+/// poster_home_screen.dart
+/// ----------------------
+/// Main screen for task posters. Handles navigation between tabs (Home, My Tasks, Chat, Profile).
+/// Fetches and displays tasks posted by the user, manages offers, and provides access to posting new tasks.
+///
+/// Suggestions:
+/// - This file is very large; consider splitting into smaller widgets and moving business logic to services or providers.
+/// - Move helper widgets/classes to their own files in Widgets/.
+/// - Use state management (Provider, Riverpod, Bloc) for complex state.
+/// - Remove commented-out or unused code.
 import 'package:flutter/material.dart';
 import '../widgets/task_poster_nav_bar.dart';
 import 'post_task_screen.dart';
@@ -21,6 +31,8 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'auth.dart';
 import 'runner_home_screen.dart';
 import '../models/event_task.dart';
+import '../models/task_response.dart';
+import '../widgets/task_card.dart';
 
 class PosterHomeScreen extends StatefulWidget {
   const PosterHomeScreen({super.key});
@@ -83,7 +95,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     return offers.length;
   }
 
-  Widget _buildSummaryCards(List<Task> tasks) {
+  Widget _buildSummaryCards(List<TaskResponse> tasks) {
     final statusCounts = {
       'OPEN': 0,
       'IN_PROGRESS': 0,
@@ -91,7 +103,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
       'CANCELLED': 0,
     };
     for (final t in tasks) {
-      final s = t.status?.toUpperCase() ?? 'OPEN';
+      final s = t.status.toUpperCase();
       if (statusCounts.containsKey(s)) statusCounts[s] = statusCounts[s]! + 1;
     }
     return Row(
@@ -159,127 +171,16 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
     );
   }
 
-  Widget _buildTaskCard(Task task) {
+  Widget _buildTaskCard(TaskResponse task) {
     return FutureBuilder<int>(
-      future: _getOffersCount(task.taskId ?? '0'),
+      future: _getOffersCount(task.taskId.toString()),
       builder: (context, snapshot) {
         final offersCount = snapshot.data ?? 0;
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        task.type?.isNotEmpty == true ? task.type : 'Other',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      task.title,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        Text('$offersCount offers received', style: TextStyle(color: Colors.green.shade700, fontSize: 13)),
-                        const SizedBox(height: 4),
-                        Text(task.description?.isNotEmpty == true ? task.description : '', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.grey.shade700)),
-                      ],
-                    ),
-                    onTap: () {
-                      // TODO: Navigate to task detail
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        // TODO: Edit task
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Edit functionality coming soon')),
-                        );
-                      },
-                      icon: Icon(Icons.edit, size: 20, color: Theme.of(context).colorScheme.primary),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                        padding: const EdgeInsets.all(8),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    IconButton(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Task'),
-                            content: const Text('Are you sure you want to delete this task? This action cannot be undone.'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirmed == true) {
-                          final userIdStr = await TokenService.getUserId();
-                          if (userIdStr == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('User not authenticated.')),
-                            );
-                            return;
-                          }
-                          final result = await _taskService.deleteTask(int.parse(task.taskId ?? '0'), int.parse(userIdStr));
-                          if (result['success']) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Task deleted successfully!')),
-                            );
-                            setState(() {
-                              _tasksFuture = _loadTasks();
-                            });
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to delete task: \\${result['error']}')),
-                            );
-                          }
-                        }
-                      },
-                      icon: Icon(Icons.delete, size: 20, color: Colors.red),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.red.shade50,
-                        padding: const EdgeInsets.all(8),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        return TaskCard(
+          task: task,
+          onTap: () {
+            // TODO: Navigate to task detail
+          },
         );
       },
     );
@@ -296,6 +197,7 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
           return Center(child: Text('Error: \\${snapshot.error}'));
         }
         final tasks = snapshot.data ?? [];
+        final taskResponses = tasks.map((t) => TaskResponse.fromJson(t)).toList();
         return ListView(
           padding: const EdgeInsets.symmetric(vertical: 0),
           children: [
@@ -372,22 +274,14 @@ class _PosterHomeScreenState extends State<PosterHomeScreen> {
               },
             ),
             const SizedBox(height: 8),
-            _buildSummaryCards(tasks.map((t) => Task.fromJson(t)).toList()),
+            _buildSummaryCards(taskResponses),
             const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('My Tasks', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary)),
             ),
             const SizedBox(height: 8),
-            ...tasks.map((taskJson) {
-              if (taskJson['type'] == 'EVENT_STAFFING') {
-                final eventTask = EventTask.fromJson(taskJson);
-                return EventTaskCard(eventTask: eventTask);
-              } else {
-                final task = Task.fromJson(taskJson);
-                return _buildTaskCard(task);
-              }
-            }).toList(),
+            ...taskResponses.map((task) => _buildTaskCard(task)).toList(),
           ],
         );
       },

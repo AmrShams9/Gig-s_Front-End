@@ -1,3 +1,12 @@
+/// offer.dart
+/// ----------
+/// Data model for offers made by runners on tasks. Used for offer creation, display, and status tracking.
+/// Fields: (list all fields here for clarity).
+///
+/// Suggestions:
+/// - Keep this model simple and focused on offer data.
+/// - Document any mapping to/from backend or related models.
+
 enum OfferStatus {
   PENDING,
   AWAITING_PAYMENT,

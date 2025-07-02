@@ -1,3 +1,13 @@
+/// runner_home_screen.dart
+/// ----------------------
+/// Main screen for runners. Handles navigation between tabs (Home, Offers, My Tasks, Chat, Profile).
+/// Fetches tasks, offers, and user info. Contains logic for filtering and displaying tasks, handling offers, and user profile actions.
+///
+/// Suggestions:
+/// - This file is very large; consider splitting into smaller widgets and moving business logic to services or providers.
+/// - Move helper widgets/classes to their own files in Widgets/.
+/// - Use state management (Provider, Riverpod, Bloc) for complex state.
+/// - Remove commented-out or unused code.
 import 'package:flutter/material.dart';
 import '../widgets/runner_nav_bar.dart';
 import 'dart:io';
@@ -20,6 +30,7 @@ import '../models/user.dart';
 import '../Widgets/chat_card.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'poster_home_screen.dart';
+import '../models/task_response.dart';
 
 class RunnerHomeScreen extends StatefulWidget {
   const RunnerHomeScreen({super.key});
@@ -32,7 +43,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
   final TaskService _taskService = TaskService();
-  late Future<List<Task>> _tasksFuture;
+  late Future<List<TaskResponse>> _tasksFuture;
   String _selectedCategory = 'All';
   Future<List<Map<String, dynamic>>>? _myOffersFuture;
   Future<List<Map<String, dynamic>>>? _acceptedOffersFuture;
@@ -51,10 +62,13 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _tasksFuture = _taskService.getAllTasks();
+    // Loads all tasks for the runner when the screen is initialized.
+    _tasksFuture = _taskService.getAllTasks().then((tasks) => tasks.map((t) => TaskResponse.fromJson(t.toJson())).toList());
     _loadMyOffers();
   }
 
+  /// Loads the offers and accepted offers for the current runner.
+  /// Used in initState and when refreshing offers.
   Future<void> _loadMyOffers() async {
     final runnerId = await TokenService.getUserId();
     if (runnerId == null) return;
@@ -64,13 +78,15 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     });
   }
 
+  /// Fetches all offers made by the runner and their associated tasks.
+  /// Used by _loadMyOffers and the "My Proposals" tab.
   Future<List<Map<String, dynamic>>> _fetchOffersWithTasks(String runnerId) async {
     final offers = await _taskService.getOffersByRunner(runnerId);
     List<Map<String, dynamic>> result = [];
     for (final offer in offers) {
       try {
         final task = await _taskService.getTaskById(offer.taskId ?? offer.id);
-        result.add({'offer': offer, 'task': task});
+        result.add({'offer': offer, 'task': TaskResponse.fromJson(task.toJson())});
       } catch (_) {
         result.add({'offer': offer, 'task': null});
       }
@@ -78,15 +94,16 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     return result;
   }
 
+  /// Fetches all accepted offers by the runner and their associated tasks.
+  /// Used by _loadMyOffers and the "My Tasks" tab.
   Future<List<Map<String, dynamic>>> _fetchAcceptedOffersWithTasks(String runnerId) async {
     final offers = await _taskService.getOffersByRunner(runnerId);
     List<Map<String, dynamic>> result = [];
     for (final offer in offers) {
-      // Only include accepted offers
       if (offer.status == OfferStatus.ACCEPTED) {
         try {
           final task = await _taskService.getTaskById(offer.taskId ?? offer.id);
-          result.add({'offer': offer, 'task': task});
+          result.add({'offer': offer, 'task': TaskResponse.fromJson(task.toJson())});
         } catch (_) {
           result.add({'offer': offer, 'task': null});
         }
@@ -95,41 +112,35 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     return result;
   }
 
+  /// Deletes an offer by its ID. Used in the "My Proposals" tab when cancelling an offer.
   Future<void> _deleteOffer(String offerId) async {
     final result = await _taskService.deleteOffer(offerId);
     if (result['success']) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer deleted.')));
       _loadMyOffers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete offer: ${result['error']}')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete offer: \\${result['error']}')));
     }
   }
 
+  /// Handles navigation when a bottom navigation bar item is tapped.
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
 
-  void _handleTaskTap(Task task) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => TaskDetailScreen(task: task),
-      ),
-    );
-  }
+  /// Handles tapping a task card in the home tab. Used in the home tab ListView.
+  // void _handleTaskTap(TaskResponse task) {
+  //   // TODO: Update navigation to use TaskResponse
+  // }
 
-  void _handleAcceptedTaskTap(Task task, Offer offer) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => AcceptedTaskDetailScreen(
-          task: task,
-          acceptedOffer: offer,
-        ),
-      ),
-    );
-  }
+  /// Handles tapping an accepted task in the "My Tasks" tab. Used in MyTasksCard.
+  // void _handleAcceptedTaskTap(TaskResponse task, Offer offer) {
+  //   // TODO: Update navigation to use TaskResponse
+  // }
 
+  /// Logs out the current user and navigates to the AuthScreen. Used in the profile tab.
   Future<void> _logout() async {
     await _authService.signOut();
     if (mounted) {
@@ -140,6 +151,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     }
   }
 
+  /// Builds the horizontal category selection buttons. Used in the home tab.
   Widget _buildCategoryButtons() {
     return Container(
       height: 100,
@@ -192,6 +204,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     );
   }
 
+  /// Builds the greeting at the top of the home tab. Used in the home tab.
   Widget _buildHomeGreeting() {
     return FutureBuilder<String?>(
       future: TokenService.getToken(),
@@ -274,6 +287,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     );
   }
 
+  /// Builds the profile screen for the runner. Used in the profile tab.
   Widget _buildProfileScreen() {
     return FutureBuilder<String?>(
       future: TokenService.getToken(),
@@ -439,21 +453,24 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
     );
   }
 
+  /// Builds the main body of the screen based on the selected tab.
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0: // Home (was Explore)
+        // Home Tab: Shows greeting, category buttons, and a list of all available tasks for the runner.
+        // The user can filter tasks by category and tap a task to view details.
         return Column(
           children: [
-            _buildHomeGreeting(),
-            _buildCategoryButtons(),
+            _buildHomeGreeting(), // Shows a personalized greeting at the top
+            _buildCategoryButtons(), // Horizontal scrollable list of categories
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
                   setState(() {
-                    _tasksFuture = _taskService.getAllTasks();
+                    _tasksFuture = _taskService.getAllTasks().then((tasks) => tasks.map((t) => TaskResponse.fromJson(t.toJson())).toList());
                   });
                 },
-                child: FutureBuilder<List<Task>>(
+                child: FutureBuilder<List<TaskResponse>>(
                   future: _tasksFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -467,15 +484,29 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                           child: Text('No tasks available at the moment.'));
                     }
 
+                    // Helper to normalize category names for comparison (e.g., 'Event Staffing' == 'EventStaffing')
+                    String normalizeCategoryName(String name) =>
+                        name.replaceAll(' ', '').replaceAll('_', '').toLowerCase();
+
                     final tasks = snapshot.data!;
+                    // List of TaskCards for each available task, filtered by selected category
                     return ListView.builder(
                       itemCount: tasks.length,
                       itemBuilder: (context, index) {
                         final task = tasks[index];
-                        if (_selectedCategory == 'All' || task.type == _selectedCategory) {
+                        // Use normalization so UI category names and enum names match (e.g., 'Event Staffing' and 'EventStaffing')
+                        if (_selectedCategory == 'All' ||
+                            normalizeCategoryName(task.category.name) == normalizeCategoryName(_selectedCategory)) {
                           return TaskCard(
                             task: task,
-                            onTap: () => _handleTaskTap(task),
+                            onTap: () {
+                              // Navigates to the task detail screen for this task
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => TaskDetailScreen(task: task),
+                                ),
+                              );
+                            },
                           );
                         }
                         return const SizedBox.shrink();
@@ -488,6 +519,8 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           ],
         );
       case 1: // Offers (was My Offers)
+        // My Proposals Tab: Shows all offers the runner has made on tasks.
+        // The user can edit or cancel their offers here.
         return FutureBuilder<List<Map<String, dynamic>>>(
           future: _myOffersFuture,
           builder: (context, snapshot) {
@@ -501,6 +534,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
             if (data.isEmpty) {
               return const Center(child: Text('You have not made any offers yet.'));
             }
+            // List of MyTasksCard for each offer made by the runner
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -538,22 +572,24 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     itemCount: data.length,
                     itemBuilder: (context, index) {
                       final offer = data[index]['offer'] as Offer;
-                      final task = data[index]['task'] as Task?;
+                      final task = data[index]['task'] as TaskResponse?;
                       if (task == null) {
                         return ListTile(title: Text('Task not found for offer \\${offer.id}'));
                       }
+                      // Each MyTasksCard shows the offer details and allows editing/cancelling
                       return Column(
                         children: [
                           MyTasksCard(
                             taskTitle: task.title,
-                            taskType: task.type,
+                            taskType: task.category.name,
                             status: offer.message, // You may want to map offer.status here
-                            deadline: task.startTime ?? DateTime.now(),
+                            deadline: task.additionalAttributes['startTime'] != null ? DateTime.tryParse(task.additionalAttributes['startTime']) ?? DateTime.now() : DateTime.now(),
                             offerAmount: offer.amount,
                             taskPoster: task.taskPoster.toString(),
                             onTap: () {},
                             taskPosterImage: 'https://via.placeholder.com/50',
                             onCancel: () async {
+                              // Cancels the offer
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
@@ -576,6 +612,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                               }
                             },
                             onEdit: () async {
+                              // Allows editing the offer amount/message
                               final amountController = TextEditingController(text: offer.amount.toString());
                               final messageController = TextEditingController(text: offer.message);
                               await showModalBottomSheet(
@@ -682,6 +719,9 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           },
         );
       case 2: // My Tasks (was Assigned Tasks)
+        // My Tasks Tab: Shows all tasks for which the runner's offer was accepted.
+        // Tasks are grouped by status: In Progress, Completed, Cancelled.
+        // The user can tap a task to view details or raise a dispute for cancelled tasks.
         return RefreshIndicator(
           onRefresh: () async {
             await _loadMyOffers();
@@ -729,11 +769,11 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
               }
               // Split tasks by status
               final inProgress = data.where((item) {
-                final status = (item['task'] as Task?)?.status?.toLowerCase();
+                final status = (item['task'] as TaskResponse?)?.status?.toLowerCase();
                 return status == 'in progress' || status == 'accepted';
               }).toList();
-              final completed = data.where((item) => (item['task'] as Task?)?.status?.toLowerCase() == 'completed').toList();
-              final cancelled = data.where((item) => (item['task'] as Task?)?.status?.toLowerCase() == 'cancelled').toList();
+              final completed = data.where((item) => (item['task'] as TaskResponse?)?.status?.toLowerCase() == 'completed').toList();
+              final cancelled = data.where((item) => (item['task'] as TaskResponse?)?.status?.toLowerCase() == 'cancelled').toList();
               return ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
@@ -751,17 +791,17 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ),
                     ...inProgress.map((item) {
                       final offer = item['offer'] as Offer;
-                      final task = item['task'] as Task;
+                      final task = item['task'] as TaskResponse;
                       return MyTasksCard(
                         taskTitle: task.title,
-                        taskType: task.type,
+                        taskType: task.category.name,
                         status: 'In Progress',
-                        deadline: task.startTime ?? DateTime.now().add(const Duration(days: 7)),
+                        deadline: task.additionalAttributes['startTime'] != null ? DateTime.tryParse(task.additionalAttributes['startTime']) ?? DateTime.now().add(const Duration(days: 7)) : DateTime.now().add(const Duration(days: 7)),
                         offerAmount: offer.amount,
                         taskPoster: 'Task Poster #${task.taskPoster}',
                         taskPosterImage: 'https://via.placeholder.com/50',
                         onTap: () {
-                          _handleAcceptedTaskTap(task, offer);
+                          // Navigates to accepted task detail screen (implement if needed)
                         },
                       );
                     }).toList(),
@@ -780,17 +820,17 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ),
                     ...completed.map((item) {
                       final offer = item['offer'] as Offer;
-                      final task = item['task'] as Task;
+                      final task = item['task'] as TaskResponse;
                       return MyTasksCard(
                         taskTitle: task.title,
-                        taskType: task.type,
+                        taskType: task.category.name,
                         status: 'Completed',
-                        deadline: task.startTime ?? DateTime.now().add(const Duration(days: 7)),
+                        deadline: task.additionalAttributes['startTime'] != null ? DateTime.tryParse(task.additionalAttributes['startTime']) ?? DateTime.now().add(const Duration(days: 7)) : DateTime.now().add(const Duration(days: 7)),
                         offerAmount: offer.amount,
                         taskPoster: 'Task Poster #${task.taskPoster}',
                         taskPosterImage: 'https://via.placeholder.com/50',
                         onTap: () {
-                          _handleAcceptedTaskTap(task, offer);
+                          // Navigates to accepted task detail screen (implement if needed)
                         },
                       );
                     }).toList(),
@@ -809,20 +849,20 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
                     ),
                     ...cancelled.map((item) {
                       final offer = item['offer'] as Offer;
-                      final task = item['task'] as Task;
+                      final task = item['task'] as TaskResponse;
                       return Row(
                         children: [
                           Expanded(
                             child: MyTasksCard(
                               taskTitle: task.title,
-                              taskType: task.type,
+                              taskType: task.category.name,
                               status: 'Cancelled',
-                              deadline: task.startTime ?? DateTime.now().add(const Duration(days: 7)),
+                              deadline: task.additionalAttributes['startTime'] != null ? DateTime.tryParse(task.additionalAttributes['startTime']) ?? DateTime.now().add(const Duration(days: 7)) : DateTime.now().add(const Duration(days: 7)),
                               offerAmount: offer.amount,
                               taskPoster: 'Task Poster #${task.taskPoster}',
                               taskPosterImage: 'https://via.placeholder.com/50',
                               onTap: () {
-                                _handleAcceptedTaskTap(task, offer);
+                                // Navigates to accepted task detail screen (implement if needed)
                               },
                             ),
                           ),
@@ -856,6 +896,8 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           ),
         );
       case 3: // Chat (was Chat, previously index 5)
+        // Chat Tab: Shows all chat conversations for the runner.
+        // The user can search, view, and tap to open a chat with another user.
         final myUserIdFuture = TokenService.getUserId();
         return FutureBuilder<String?>(
           future: myUserIdFuture,
@@ -866,6 +908,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
           },
         );
       case 4: // Profile
+        // Profile Tab: Shows the runner's profile, stats, and allows switching roles or logging out.
         return _buildProfileScreen();
       default:
         return const Center(
@@ -876,6 +919,7 @@ class _RunnerHomeScreenState extends State<RunnerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Main build method for the RunnerHomeScreen.
     return Scaffold(
       body: SafeArea(
         child: _buildBody(),
