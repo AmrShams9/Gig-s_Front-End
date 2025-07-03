@@ -19,6 +19,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import '../Screens/auth.dart'; // Fix import for AuthScreen
 import '../Screens/edit_profile_screen.dart'; // Added import for EditProfileScreen
 import '../Widgets/emergency_location_button.dart'; // Added import for EmergencyLocationButton
+import 'add_payment_screen.dart'; // Correct import for AddPaymentScreen in widgets directory
 
 class ProfileScreenWidget extends StatelessWidget {
   final bool isRunner;
@@ -226,6 +227,29 @@ class ProfileScreenWidget extends StatelessWidget {
                   label: Text(switchRoleLabel),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              // Add Payment button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => AddPaymentScreen(userId: user['sub'] ?? user['id']),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.attach_money),
+                  label: const Text('Add Payment'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     padding: const EdgeInsets.symmetric(vertical: 14),

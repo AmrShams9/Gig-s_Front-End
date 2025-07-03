@@ -59,13 +59,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
       return;
     }
-    final url = Uri.parse('http://10.0.2.2:8888/api/user/profile/basic?userId=$userId');
+    final url = Uri.parse('http://10.0.2.2:8888/auth/profile/basic?userId=$userId');
     final body = jsonEncode({
       'firstName': _firstNameController.text.trim(),
       'lastName': _lastNameController.text.trim(),
-      'email': _emailController.text.trim(),
       'phoneNumber': _phoneController.text.trim(),
+      'email': _emailController.text.trim(),
     });
+    print('DEBUG: URL: ' + url.toString());
+    print('DEBUG: Headers: ' + {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    }.toString());
+    print('DEBUG: Body: ' + body);
     try {
       final response = await http.put(
         url,
@@ -75,12 +81,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         },
         body: body,
       );
+      print('DEBUG: Status code: ' + response.statusCode.toString());
+      print('DEBUG: Response body: ' + response.body);
       setState(() => _isSaving = false);
       if (response.statusCode == 200) {
         if (mounted) Navigator.of(context).pop(true);
       } else {
+        String errorMsg = response.body;
+        if (response.statusCode == 400 && response.body.contains('No changes detected in the profile')) {
+          errorMsg = 'No changes detected. Please modify your profile before saving.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile: ${response.body}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to update profile: ' + errorMsg), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -147,6 +159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 controller: _firstNameController,
                 icon: Icons.person,
                 validator: (v) => v == null || v.trim().isEmpty ? 'Enter first name' : null,
+                hintText: widget.firstName,
               ),
               const SizedBox(height: 18),
               _ProfileField(
@@ -154,6 +167,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 controller: _lastNameController,
                 icon: Icons.person_outline,
                 validator: (v) => v == null || v.trim().isEmpty ? 'Enter last name' : null,
+                hintText: widget.lastName,
               ),
               const SizedBox(height: 18),
               _ProfileField(
@@ -162,6 +176,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 icon: Icons.email,
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) => v == null || !v.contains('@') ? 'Enter a valid email' : null,
+                hintText: widget.email,
               ),
               const SizedBox(height: 18),
               _ProfileField(
@@ -170,6 +185,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 icon: Icons.phone,
                 keyboardType: TextInputType.phone,
                 validator: (v) => v == null || v.trim().isEmpty ? 'Enter phone number' : null,
+                hintText: widget.phoneNumber,
               ),
             ],
           ),
@@ -211,6 +227,7 @@ class _ProfileField extends StatelessWidget {
   final IconData icon;
   final String? Function(String?)? validator;
   final TextInputType? keyboardType;
+  final String? hintText;
 
   const _ProfileField({
     required this.label,
@@ -218,6 +235,7 @@ class _ProfileField extends StatelessWidget {
     required this.icon,
     this.validator,
     this.keyboardType,
+    this.hintText,
   });
 
   @override
@@ -233,6 +251,7 @@ class _ProfileField extends StatelessWidget {
           prefixIcon: Icon(icon, color: const Color(0xFF2C5364)),
           labelText: label,
           labelStyle: const TextStyle(fontWeight: FontWeight.w500),
+          hintText: hintText,
           filled: true,
           fillColor: Colors.white,
           enabledBorder: OutlineInputBorder(
